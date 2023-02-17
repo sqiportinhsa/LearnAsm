@@ -195,7 +195,7 @@ PrFrame proc
 ;
 ; Exit: BX = num
 ;
-; Destroys:
+; Destroys: AX, BX, CX, DX
 ;----------------------------------------------------------
 
 GetNum	proc
