@@ -1,36 +1,7 @@
-.model tiny
-
-locals ??
-
 .code
 
-org 100h
-
-Start:	mov ax, 0b800h
-	mov es, ax
-
-	call GetNum
-	mov dx, bx
-
-	mov ah, 9h
-	xor si, si
-	call PrBin
-
-	mov ah, 0bh
-	mov dx, 0A1h
-	call PrHex
-
-	mov ax, 64h
-	mov bh, 0Ah
-	call PrDec
-
-	mov si, 160*5d  + 10d
-	mov di, 160*10d + 20d
-	call PrFrame
-
-	mov ax, 4c00h  ; exit 0
-	int 21h
-	
+;-----------------------------------------------------------
+;			 | PrBin |
 ;-----------------------------------------------------------
 ; Print colored number in binary system
 ;-----------------------------------------------------------
