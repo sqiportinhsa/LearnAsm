@@ -69,6 +69,25 @@ SLoop:	mov al, SumP[si]
 	inc si
 	loop SLoop
 
+	call GetNum		; a
+	push bx			; save a
+
+	mov dx, bx		; print bin
+	mov ah, 0fh
+	mov si, 160*8d + BinSt
+	call PrBin
+				; print hex:
+	pop  dx			; restore a
+	push dx			; save a
+	mov si, 160*8d + HexSt
+	call PrHex
+				; print dec:
+	mov bh, ah		; move color
+	pop ax			; restore a
+	push ax			; save a
+	mov si, 160*8d + DecSt
+	call PrDec
+
 	mov ax, 4c00h	; exit(0)
 	int 21h
 
