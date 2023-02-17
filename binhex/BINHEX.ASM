@@ -1,4 +1,7 @@
 .model tiny
+
+locals ??
+
 .code
 
 org 100h
@@ -6,8 +9,10 @@ org 100h
 Start:	mov ax, 0b800h
 	mov es, ax
 
+	call GetNum
+	mov dx, bx
+
 	mov ah, 9h
-	mov dx, 01h
 	xor si, si
 	call PrBin
 
@@ -210,7 +215,50 @@ PrFrame proc
 	ret
 	endp
 
+;----------------------------------------------------------
+;			 | GetNum |
+;----------------------------------------------------------
+; Expects: None
+;
+; Entry:   None
+;
+; Exit: BX = num
+;
+; Destroys:
+;----------------------------------------------------------
 
+GetNum	proc
+
+	xor bx, bx	; to store number
+	xor dx, dx	; to store digit and 0Ah
+
+	mov dh, 0Ah	; new num = num*10 + new digit
+	mov cx, 05h	; max num in word is 5-digit
+
+??Digit:
+	xor ax, ax	; clean ax
+	mov ah, 01h	; getc()
+	int 21h		 
+
+	cmp al, 0Dh	; if '\r' break
+	je ??Break
+
+	sub al, '0'	; get digit from ascii code
+	mov dl, al	; save digit
+
+	mov ax, bx	; bx * 10
+	mul dh		
+	mov bx, ax
+
+	xor ax, ax	; clear ax
+	mov al, dl	; restore digit
+	add bx, ax	; bx += new digit
+
+	loop ??Digit
+
+??Break:
+	ret
+	endp
 .data
 
 HexArr db '0123456789ABCDEF'
