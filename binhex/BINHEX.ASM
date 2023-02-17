@@ -19,6 +19,10 @@ Start:	mov ax, 0b800h
 	mov bh, 0Ah
 	call PrDec
 
+	mov si, 160*5d  + 10d
+	mov di, 160*10d + 20d
+	call PrFrame
+
 	mov ax, 4c00h  ; exit 0
 	int 21h
 	
@@ -109,7 +113,7 @@ PrDec 	  proc
 	  add si, 08h   ; move ptr to the last digit
 	  mov di, 0ah   ; di = 10
 
-??Digit:  mov DX, 0h	; add higher part for num in AX	 
+??Digit:  xor DX, DX	; complement AX to dword	 
 
 	  div DI	; (DX, AX) / 10
 			; DX := num %  10
@@ -127,9 +131,97 @@ PrDec 	  proc
 
 	  ret
 	  endp
-	
+
+;----------------------------------------------------------
+;			 | PrFrame |
+;----------------------------------------------------------
+; Prints colored rectangular frame by top left
+;                                  and lower right corners
+;----------------------------------------------------------
+; Expects: es -> video memory
+;
+; Entry: SI = top left  corner position
+;	 DI = low right corner position
+;	 BH = color
+; 	 
+; Exit: None
+;
+; Destroys: AX, DX, SI, DI
+;----------------------------------------------------------
+
+PrFrame proc
+
+	mov AX, DI
+	sub AX, SI	; diff between DI and SI
+	xor DX, DX	; complement AX to dword
+
+	push bx
+	mov  bx, ScrWidth
+				; AX := frame height
+	div  bx			; DX := frame width
+
+	mov  bl, 2		; div dx to 2
+	xchg ax, dx
+	div  bl
+	xchg ax, dx
+ 
+	pop  bx	
+
+	mov BL, TLCorner		; set top left corner
+	mov word ptr es:[si], bx
+	add SI, ScrWidth
+
+	mov BL, LRCorner		; ser low right corner
+	mov word ptr es:[di], bx
+	sub di, ScrWidth
+
+	dec AX
+
+	mov BL, VerLine			; draw vert lines
+	mov CX, AX
+
+??Vert: mov word ptr es:[si], bx
+	mov word ptr es:[di], bx
+	add si, ScrWidth
+	sub di, ScrWidth
+	loop ??Vert
+
+	mov BL, LLCorner		; set low left corner
+	mov word ptr es:[si], bx
+	add SI, 2
+
+	mov BL, TRCorner		; set top right corner
+	mov word ptr es:[di], bx
+	sub DI, 2
+
+	dec DX
+
+	mov BL, HorLine			; draw hor lines
+	mov CX, DX
+
+??Hor:	mov word ptr es:[si], bx
+	mov word ptr es:[di], bx
+	inc si
+	inc si
+	dec di
+	dec di
+	loop ??Hor
+
+	ret
+	endp
+
+
 .data
 
 HexArr db '0123456789ABCDEF'
+
+HorLine  db '-'
+VerLine  db '|'
+TLCorner db '+'
+TRCorner db '+'
+LLCorner db '+'
+LRCorner db '+'
+
+ScrWidth equ 160d
 
 end Start
