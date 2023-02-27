@@ -1,5 +1,7 @@
 .code
 
+
+
 ;==========================================================
 ;            | WriteText |
 ;----------------------------------------------------------
@@ -72,6 +74,7 @@ WriteText proc
 
 ??StopOnSpace
     stosw
+    mov dx, cx
     jmp ??GoNextLine
 
 ??GoNextLine:
@@ -90,7 +93,6 @@ WriteText proc
 
 ??NewSpace:
     mov dx, cx
-    dec dx
     jmp ??SymLoop
 
 ??Exit:
@@ -221,13 +223,6 @@ GetNum	proc
 ;==========================================================
 
 .data
-
-HorLine  db '-'
-VerLine  db '|'
-TLCorner db '+'
-TRCorner db '+'
-LLCorner db '+'
-LRCorner db '+'
 
 ScrWidth equ 160d
 
