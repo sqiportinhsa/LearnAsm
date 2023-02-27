@@ -1,6 +1,27 @@
 .code
 
 
+;==========================================================
+;            | TextInFrame |
+;----------------------------------------------------------
+; Draws frame and prints text in it
+;----------------------------------------------------------
+; Expects: ES -> video memory
+;
+; Entry: DI = position for 1st symbol
+;        DS = offset text array
+;        AH = color
+;        BH = line width in symbols
+;
+; Exit: None
+; 
+; Destroys: 
+;----------------------------------------------------------
+
+TextInFrame proc
+
+
+
 
 ;==========================================================
 ;            | WriteText |
@@ -13,8 +34,8 @@
 ;----------------------------------------------------------
 ; Expects: ES -> video memory
 ; 
-; Entry: DI = position for 1st symbol
-;        DS = offset text array
+; Entry: ES:[DI] = position for 1st symbol
+;        SI = offset text array
 ;        AH = color
 ;        BH = line width  in symbols 
 ;
@@ -34,7 +55,7 @@ WriteText proc
     dec bh              ; num of last sym in str
 
 ??SymLoop:
-    mov al, [ds]
+    mov al, [si]
 
     cmp al, '$'         ; stop if next sym is $
     jz ??Exit
@@ -44,7 +65,7 @@ WriteText proc
 
     stosw               ; write sym to vmem
     inc cl
-    inc ds
+    inc si
 
     cmp al, ' '
     jz ??NewSpace       ; renew last space's pos 
@@ -61,7 +82,8 @@ WriteText proc
     mov al, ' '         ; clear everything after last ' '
     xor ch, ch              ; calc sym amount to clean
     sub cl, dl 
-    sub ds, cx              ; return ds to 1st word sym
+    sub si, cx              ; return ds to 1st word sym
+    std
     rep stosw               ; clear after ' '
                  
     mov cx, dx
@@ -78,13 +100,13 @@ WriteText proc
     jmp ??GoNextLine
 
 ??GoNextLine:
-    mov si, cx          ; save cx
+    mov ds, cx          ; save cx
     xor ch, ch
     shl cl
     sub di, cx          ; di -> 1st sym of current string
     add di, ScrWidth    ; di -> 1st sym of next string
 
-    mov cx, si          ; ch - prev string
+    mov cx, ds          ; ch - prev string
     inc ch              ; ch - current string
     xor cl, cl          ; cl - 1st sym of string
 
@@ -97,6 +119,98 @@ WriteText proc
 
 ??Exit:
     inc bh  ; return bh to origin value
+    ret
+
+endp
+
+;==========================================================
+
+
+;==========================================================
+;            | CountLines |
+;----------------------------------------------------------
+; Counts lines for writing with auto line breaking
+;----------------------------------------------------------
+; Expects: ES -> video memory
+; 
+; Entry: DI = offset lengths array
+;        SI = offset text    array
+;        AH = color
+;        BH = line width  in symbols 
+;
+; Exit:  DH = amount of strings
+;
+; Destroys: AL, CX, DX, DS, SI
+;---------------------------------------------------------
+
+CountLines proc
+
+    xor cx, cx          ; cl = pos in string in sym
+                        ; ch = string number in sym
+
+    xor dx, dx          ; dl = last ' ' pos in string
+                        ; dh = last ' ' string number
+
+    dec bh              ; count elems from 0
+
+??SymLoop:
+    mov al, [si]
+
+    cmp al, '$'         ; stop if sym is $
+    jz ??Exit
+
+    cmp cl, bh          ; check string len
+    jz ??BreakLine
+
+    inc cl              ; go to next sym
+    inc si
+
+    cmp al, ' '
+    jz ??NewSpace       ; renew last space's pos 
+
+    jmp ??SymLoop
+
+??BreakLine:
+    cmp al, ' '
+    jz ??StopOnSpace
+
+    cmp ch, dh
+    jnz ??LongWord
+
+    xor ch, ch              ; calc written part len
+    sub cl, dl 
+    sub si, cx              ; return si to 1st word sym
+                 
+    mov cx, dx              ; cx -> 1st sym after ' ' 
+    inc cl
+    jmp ??GoNextLine
+
+??LongWord:
+    jmp ??GoNextLine
+
+??StopOnSpace
+    mov dx, cx
+    inc si
+    jmp ??GoNextLine
+
+??GoNextLine:
+    mov [di], cl        ; save str len
+    inc di
+
+    inc ch              ; ch -> current string
+    xor cl, cl          ; cl -> 1st sym of string
+
+    jmp ??SymLoop
+
+
+??NewSpace:
+    mov dx, cx
+    jmp ??SymLoop
+
+??Exit:
+    mov [di], 0 ; end of strings len arr
+    inc bh      ; return bh to origin value
+    inc dh      ; counter from 0 -> from 1
     ret
 
 endp
