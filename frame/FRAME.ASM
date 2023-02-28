@@ -1,5 +1,12 @@
+.model tiny
+locals ??
 .code
+org 100h
 
+Start:
+
+    mov ax, 4c00h	; exit(0)
+	int 21h
 
 ;==========================================================
 ;            | TextInFrame |
@@ -8,10 +15,11 @@
 ;----------------------------------------------------------
 ; Expects: ES -> video memory
 ;
-; Entry: DI = position for 1st symbol
-;        DS = offset text array
-;        AH = color
-;        BH = line width in symbols
+; Entry: ES:[DI] = left corner of the table
+;        DS     = offset text array
+;        BP     = offset free memory   
+;        AH     = color
+;        BH     = line width in symbols
 ;
 ; Exit: None
 ; 
@@ -20,8 +28,8 @@
 
 TextInFrame proc
 
-
-
+endp
+;==========================================================
 
 ;==========================================================
 ;            | WriteText |
@@ -58,15 +66,16 @@ WriteText proc
     mov dh, [bp]
     mov dl,  bh
     sub dl, dh
-    shr dl              ; dl = shift for string in sym
-    shl dl              ; dl = shift for string in bytes
+    shr dl, 1           ; dl = shift for string in sym
+    shl dl, 1           ; dl = shift for string in bytes
     xor dh, dh          ; dx = shift for string in bytes
     add di, dx          ; di -> 1st sym of string
 
     mov dh, [bp]        ; dh = len of string in sym
                         ; dl = shift from left border
 
-    jdxz ??Exit         ; stop if end of array
+    test dx, dx
+    jz ??Exit         ; stop if end of array
 
     mov cl, dh          ; set counter = str len
 
@@ -81,7 +90,7 @@ WriteText proc
 
     ??GoNextLine:
 
-    shl dl              ; dl = len of string in bytes 
+    shl dl, 1           ; dl = len of string in bytes 
     add dl, dh          ; dl = shitf from left brd in bytes
 
                         ; di -> 1st sym from border
@@ -97,16 +106,14 @@ WriteText proc
     jmp ??GoNextLine
 
 ??Exit:
-    inc bh  ; return bh to origin value
     ret
 
 endp
-
 ;==========================================================
 
 
 ;==========================================================
-;            | CountLinesAndLength |
+;            | CountLines |
 ;----------------------------------------------------------
 ; Counts lines for writing with auto line breaking
 ;----------------------------------------------------------
@@ -168,7 +175,7 @@ CountLines proc
 ??LongWord:
     jmp ??GoNextLine
 
-??StopOnSpace
+??StopOnSpace:
     mov dx, cx
     inc si
     jmp ??GoNextLine
@@ -188,50 +195,10 @@ CountLines proc
     jmp ??SymLoop
 
 ??Exit:
-    mov [di], 0 ; end of strings len arr
-    inc bh      ; return bh to origin value
-    inc dh      ; counter from 0 -> from 1
-    ret
-
-endp
-
-;==========================================================
-
-;==========================================================
-;            | CalcShift |
-;----------------------------------------------------------
-; Calculates shifts in bytes to make strings centered
-;----------------------------------------------------------
-; Expects: None
-; 
-; Entry: DI = offset length array
-;        BH = max str len
-;
-; Exit:  DI = offset shift array
-;
-; Dectroys: AX, CX
-;---------------------------------------------------------
-
-CalcShift proc
-
-    mov cx, di      ; save arr start 
-
-??CalcLoop:
-    mov al,  bh
-    mov ah, [di]
-
-    test ah, ah     ; end of arr
-    jz ??Exit
-
-    sub al, ah      ; al = spaces at line
-    shr al          ; shift
-
-    mov [di], al
-    inc di
-    jmp ??CalcLoop
-
-??Exit:
-    mov di, cx      ; restore arr start
+    xor cx, cx
+    mov [di], cx        ; end of strings len arr
+    inc bh              ; return bh to origin value
+    inc dh              ; counter from 0 -> from 1
     ret
 
 endp
@@ -246,21 +213,21 @@ endp
 ; Expects: es -> video memory
 ;
 ; Entry: DI = top left  corner position
-; 	 DS = offset table of symbols
+; 	 SI = offset table of symbols
 ;    AH = color
-;    CX = width  in symbols
+;    CL = width  in symbols
 ;    BH = height in symbols
 ;
 ;    table:
 ;           1------2------3
 ;           |             |
 ;           4      5      6
-:           |             |
-:           7------8------9
+;           |             |
+;           7------8------9
 ;
 ; Exit: None
 ;
-; Destroys: AX, BL, CX, DL, SI, DI
+; Destroys: AX, BL, CH, DX, DI
 ;----------------------------------------------------------
 
 DrawLine macro 
@@ -275,38 +242,42 @@ endm
 
 PrFrame proc
 
+    xor ch, ch          ; cx = cl = width in symbols
+
     sub cx, 2           ; width count for central sym
-    mov si, cx          ; save count
+    mov dh, cl          ; save count
 
     sub bh, 2           ; height  count for central sym
 
-    mov al, [ds + 0]    ; first line
-    mov bl, [ds + 1]
-    mov dl, [ds + 2]
+    mov al, [si + 0]    ; first line
+    mov bl, [si + 1]
+    mov dl, [si + 2]
 
     DrawLine
 
-    mov al, [ds + 4]    ; inner lines
-    mov bl, [ds + 5]
-    mov dl, [ds + 6]
+    mov al, [si + 4]    ; inner lines
+    mov bl, [si + 5]
+    mov dl, [si + 6]
 
-??LineLoop: mov cx, si  
+??LineLoop: mov cl, dh
             DrawLine
             dec bh 
             test bh, bh
             jnz ??LineLoop
 
-    mov cx, si          ; restore count
+    mov cl, dh          ; restore count
     
-    mov al, [ds + 7]    ; last line
-    mov bl, [ds + 8]
-    mov dl, [ds + 9]
+    mov al, [si + 7]    ; last line
+    mov bl, [si + 8]
+    mov dl, [si + 9]
 
     DrawLine
 
+    mov cl, dh
+    add cl, 2
+
 ret
 endp
-
 ;==========================================================
 
 ;==========================================================
