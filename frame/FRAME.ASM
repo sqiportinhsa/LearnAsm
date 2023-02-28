@@ -8,38 +8,59 @@ Start:
     mov ax, 4c00h	; exit(0)
 	int 21h
 
-;==========================================================
+;====================================================================
 ;            | TextInFrame |
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Draws frame and prints text in it
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Expects: ES -> video memory
 ;
-; Entry: ES:[DI] = left corner of the table
-;        DS     = offset text array
-;        BP     = offset free memory   
-;        AH     = color
-;        BH     = line width in symbols
+; Entry: BP = left corner of the table
+;        SI = offset text array
+;        DI = offset free memory   
+;        BX = offset frame style
+;        AH = color
+;        DH = table width in symbols
 ;
 ; Exit: None
 ; 
-; Destroys: 
-;----------------------------------------------------------
+; Destroys: AL, BX, CX, DX, SI, DI, BP
+;--------------------------------------------------------------------
 
 TextInFrame proc
 
-endp
-;==========================================================
+    push bx, dx, si, di        ; save style, width, text, len
+    mov bh, dh                 ; frame width
+    sub bh, 2                  ; string len = fr wid - borders
+    call CountLines                 ; call
+    mov bh, dh                 ; height
+    mov di, bp                 ; pos in vmem
+    pop bp, dx, cx, si         ; restore len, text, width, style
 
-;==========================================================
+
+    push dx, di                ; text, vmem
+    call PrFrame                    ; call
+    mov bh, cl                 ; frame width
+    pop di, si                 ; vmem, text
+
+    add di, 160d               ; text starts 1 line above frame start
+    inc di                     ; move text because of left border
+    sub bh, 2                  ; string len = fr wid - borders
+    call WriteText                  ; call
+
+    ret
+endp
+;====================================================================
+
+;====================================================================
 ;            | WriteText |
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Prints $-terminated text to screen using video memory 
 ; Feature: if text is longer than string length
 ; it would be written in several strings automatically
 ; Breaking line is carried out by spaces, using '-'
 ; for breaking words longer than string length
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Expects: ES -> video memory
 ; 
 ; Entry: ES:[DI] = position for 1st symbol
@@ -56,7 +77,7 @@ endp
 ;           DI - moved ptr in vmem 
 ;           SI - moved to the end of text arr
 ;           BP - moved to the end of len  arr
-;---------------------------------------------------------
+;--------------------------------------------------------------------
 
 WriteText proc
 
@@ -109,26 +130,26 @@ WriteText proc
     ret
 
 endp
-;==========================================================
+;====================================================================
 
 
-;==========================================================
+;====================================================================
 ;            | CountLines |
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Counts lines for writing with auto line breaking
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Expects: ES -> video memory
 ; 
-; Entry: DI = offset lengths array
-;        SI = offset text    array
+; Entry: DI = offset len  array
+;        SI = offset text array
 ;        AH = color
 ;        BH = line width in symbols 
 ;
 ; Exit:  DH = amount of strings
-;        DI = offset lengthes array
+;        DI -> end of offset len array
 ;
-; Destroys: AL, CX, DX, DS, SI
-;---------------------------------------------------------
+; Destroys: AL, CX, DX, SI, DI
+;--------------------------------------------------------------------
 
 CountLines proc
 
@@ -202,14 +223,14 @@ CountLines proc
     ret
 
 endp
-;==========================================================
+;====================================================================
 
-;==========================================================
+;====================================================================
 ;			 | PrFrame |
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Prints colored rectangular frame by top left
-;                                  and lower right corners
-;----------------------------------------------------------
+;                                         and lower right corners
+;--------------------------------------------------------------------
 ; Expects: es -> video memory
 ;
 ; Entry: DI = top left  corner position
@@ -227,8 +248,8 @@ endp
 ;
 ; Exit: None
 ;
-; Destroys: AX, BL, CH, DX, DI
-;----------------------------------------------------------
+; Destroys: AL, BL, CH, DX, DI, SI
+;--------------------------------------------------------------------
 
 DrawLine macro 
         cld             ;; draws line 12........23
@@ -278,11 +299,11 @@ PrFrame proc
 
 ret
 endp
-;==========================================================
+;====================================================================
 
-;==========================================================
+;====================================================================
 ;			 | GetNum |
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 ; Expects: None
 ;
 ; Entry:   None
@@ -290,7 +311,7 @@ endp
 ; Exit: BX = num
 ;
 ; Destroys: AX, BX, CX, DX
-;----------------------------------------------------------
+;--------------------------------------------------------------------
 
 GetNum	proc
 
@@ -324,7 +345,7 @@ GetNum	proc
 ??Break:
 	ret
 	endp
-;==========================================================
+;====================================================================
 
 .data
 
