@@ -29,19 +29,19 @@ Start:
 
 TextInFrame proc
 
-    push bx, dx, si, di        ; save style, width, text, len
+    push bx dx si di           ; save style, width, text, len
     mov bh, dh                 ; frame width
     sub bh, 2                  ; string len = fr wid - borders
     call CountLines                 ; call
     mov bh, dh                 ; height
     mov di, bp                 ; pos in vmem
-    pop bp, dx, cx, si         ; restore len, text, width, style
+    pop bp dx cx si            ; restore len, text, width, style
 
 
-    push dx, di                ; text, vmem
+    push dx di                 ; text, vmem
     call PrFrame                    ; call
     mov bh, cl                 ; frame width
-    pop di, si                 ; vmem, text
+    pop di si                  ; vmem, text
 
     add di, 160d               ; text starts 1 line above frame start
     inc di                     ; move text because of left border
