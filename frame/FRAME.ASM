@@ -1,12 +1,4 @@
-.model tiny
-locals ??
 .code
-org 100h
-
-Start:
-
-    mov ax, 4c00h	; exit(0)
-	int 21h
 
 ;====================================================================
 ;            | TextInFrame |
@@ -265,7 +257,7 @@ PrFrame proc
 
     xor ch, ch          ; cx = cl = width in symbols
 
-    sub cx, 2           ; width count for central sym
+    sub cx, 2           ; symbols between borders
     mov dh, cl          ; save count
 
     sub bh, 2           ; height  count for central sym
@@ -302,45 +294,49 @@ endp
 ;====================================================================
 
 ;====================================================================
+
+
+
+;====================================================================
 ;			 | GetNum |
+;--------------------------------------------------------------------
+; Reads number written in dec notation from memory 
+;                                             and returns its value
 ;--------------------------------------------------------------------
 ; Expects: None
 ;
-; Entry:   None
+; Entry: SI = offset num 
 ;
 ; Exit: BX = num
+;       SI -> ' ' after num
 ;
-; Destroys: AX, BX, CX, DX
+; Destroys: AX, BX, DH
 ;--------------------------------------------------------------------
 
 GetNum	proc
 
 	xor bx, bx	; to store number
-	xor dx, dx	; to store digit and 0Ah
+	xor dh, dh	; to store 0Ah
 
 	mov dh, 0Ah	; new num = num*10 + new digit
-	mov cx, 05h	; max num in word is 5-digit
 
 ??Digit:
-	xor ax, ax	; clean ax
-	mov ah, 01h	; getc()
-	int 21h		 
+	xor ax, ax	; clear ax
+	mov al, [si]	 
 
-	cmp al, 0Dh	; if '\r' break
+	cmp al, ' '	; space is the end of number
 	je ??Break
 
 	sub al, '0'	; get digit from ascii code
-	mov dl, al	; save digit
 
-	mov ax, bx	; bx * 10
+	xchg ax, bx	; bx * 10
 	mul dh		
-	mov bx, ax
+	xchg bx, ax
 
-	xor ax, ax	; clear ax
-	mov al, dl	; restore digit
 	add bx, ax	; bx += new digit
+    inc si
 
-	loop ??Digit
+	jmp ??Digit
 
 ??Break:
 	ret
@@ -350,5 +346,3 @@ GetNum	proc
 .data
 
 ScrWidth equ 160d
-
-end Start
