@@ -23,7 +23,7 @@ TextInFrame proc
 
     push bx dx si di           ; save style, width, text, len
     mov bh, dh                 ; bh = frame width
-    sub bh, 2                  ; string len = fr wid - borders
+    sub bh, 4                  ; string len = fr wid - borders
     call CountLines                 ; call
     mov bh, dh                 ; height
     mov di, bp                 ; pos in vmem
@@ -37,8 +37,8 @@ TextInFrame proc
     pop di si                  ; vmem, text
 
     add di, 160d               ; text starts 1 line above frame start
-    add di, 2                  ; move text because of left border
-    sub bh, 2                  ; string len = fr wid - borders
+    add di, 4                  ; move text because of left border
+    sub bh, 4                  ; string len = fr wid - borders
     call WriteText                  ; call
 
     ret
@@ -78,19 +78,22 @@ WriteText proc
 
 ??LineLoop:
     mov dh, [bp]        ; dh = str len
+
+    test dh, dh         ; stop if end of array
+    jz ??Exit           ; needed for ' ' ended last string
+
     mov dl,  bh         ; dl = line len
     sub dl, dh          ; dl = free spaces in line
+    inc dl              ; dl = free spaces + 1 to round shift up
     shr dl, 1           ; dl = shift for string in sym (free / 2)
     shl dl, 1           ; dl = shift for string in bytes
     xor dh, dh          ; dx = shift for string in bytes
     add di, dx          ; di -> 1st sym of string
 
-    mov dh, [bp]        ; dh = len of string in sym
+    mov dh, [bp]        ; dh = str len
                         ; dl = start of str's 1st sym 
                         ;      from left board in bytes
 
-    test dh, dh
-    jz ??Exit           ; stop if end of array
 
     mov cl, dh          ; set counter = str len
 
@@ -98,14 +101,14 @@ WriteText proc
         mov al, [si]
         stosw
         inc si
-        loop ??SymLoop
+        loop ??SymLoop  
 
     mov al, [si]        ; stop if end of text
-    cmp al, '$'
+    cmp al, '$'         ; needed for 1-string text case
     jz ??Exit
 
-    cmp al, ' '
-    jnz ??LongWord
+    cmp al, ' '         ; if there isnt ' ' after last sym we need 
+    jnz ??LongWord      ; '-' to split the word into two parts
 
     inc si              ; skip printing ' '
 
@@ -122,9 +125,11 @@ WriteText proc
     inc bp
     jmp ??LineLoop
 
-??LongWord:
+??LongWord:             ; '-' was counted for string len, the last
+    sub di, 2           ; sym is extra. replace it symbol with '-'.
     mov al, '-'
     stosw
+    dec si              ; extra sym was counted to be on next line
     jmp ??GoNextLine
 
 ??Exit:
@@ -163,47 +168,50 @@ CountLines proc
     dec dh              ; dh < 0 before first space
                         ; for long word on first string case
 
-    dec bh              ; count elems from 0
-
 ??SymLoop:
-    mov al, [si]
+    mov al, [si]        ; al = sym
 
     cmp al, '$'         ; stop if sym is $
     jz ??Exit
 
-    cmp cl, bh          ; check string len
-    jz ??BreakLine
+    cmp cl, bh          ; check string len. if equal - prev sym
+    jz ??BreakLine      ; was last on this string
 
     inc cl              ; go to next sym
-    inc si
+    inc si 
 
     cmp al, ' '
-    jz ??NewSpace       ; renew last space's pos 
+    jz ??NewSpace       ; renew last space's pos
 
     jmp ??SymLoop
 
 ??BreakLine:
-    cmp al, ' '
-    jz ??StopOnSpace
+    cmp al, ' '         ; last string sym was the last for a word
+    jz ??StopOnSpace    ; current sym is a space
 
-    cmp ch, dh
-    jnz ??LongWord
+    cmp ch, dh          ; if there was no spaces on this line
+    jnz ??LongWord      ; continue write this long word on next line
 
-    xor ch, ch              ; calc written part len
-    sub cl, dl 
+    xor ch, ch              
+    sub cl, dl              ; cx = len of written part of last word 
     sub si, cx              ; return si to 1st word sym
                  
     mov cx, dx              ; cx -> 1st sym after ' ' 
-    dec cl
+    dec cx                  ; last sym has pos cx - 2, len = pos + 1
     jmp ??GoNextLine
 
-??LongWord:
-    jmp ??GoNextLine
+??LongWord:             ; word len is more than string len.
+    dec si              ; return the last sym on string to array.
+                        ; the next str would be started with it
+    jmp ??GoNextLine    ; on this pos would be '-' sym, 
+                        ; '-' is counted in len.
+                        ; cx = last sym pos + 1 = string len.
 
-??StopOnSpace:
-    mov dx, cx
-    inc si
-    jmp ??GoNextLine
+??StopOnSpace:              ; last string sym was the last for a word
+    mov dx, cx              ; current symbol is a space, skip it 
+    inc si                  ; and start new line with new word.
+    jmp ??GoNextLine        ; remember that last space was here.
+                            ; cx = last sym pos + 1 = string len
 
 ??GoNextLine:
     mov [di], cl        ; save str len
@@ -216,7 +224,7 @@ CountLines proc
 
 
 ??NewSpace:
-    mov dx, cx          ; 1st sym after space
+    mov dx, cx          ; dx -> first sym of word after ' '
     jmp ??SymLoop
 
 ??Exit:
@@ -226,7 +234,6 @@ CountLines proc
 
     xor cx, cx
     mov [di], cx        ; end of strings len arr
-    inc bh              ; return bh to origin value
     inc dh              ; counter from 0 -> from 1
     ret
 
