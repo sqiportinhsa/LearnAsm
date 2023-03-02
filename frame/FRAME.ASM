@@ -37,7 +37,7 @@ TextInFrame proc
     pop di si                  ; vmem, text
 
     add di, 160d               ; text starts 1 line above frame start
-    inc di                     ; move text because of left border
+    add di, 2                  ; move text because of left border
     sub bh, 2                  ; string len = fr wid - borders
     call WriteText                  ; call
 
@@ -86,10 +86,11 @@ WriteText proc
     add di, dx          ; di -> 1st sym of string
 
     mov dh, [bp]        ; dh = len of string in sym
-                        ; dl = shift from left border
+                        ; dl = start of str's 1st sym 
+                        ;      from left board in bytes
 
     test dh, dh
-    jz ??Exit         ; stop if end of array
+    jz ??Exit           ; stop if end of array
 
     mov cl, dh          ; set counter = str len
 
@@ -99,13 +100,18 @@ WriteText proc
         inc si
         loop ??SymLoop
 
+    mov al, [si]        ; stop if end of text
+    cmp al, '$'
+    jz ??Exit
+
     cmp al, ' '
     jnz ??LongWord
 
     ??GoNextLine:
 
-    shl dl, 1           ; dl = len of string in bytes 
-    add dl, dh          ; dl = shitf from left brd in bytes
+    shl dh, 1           ; dl = len of string in bytes 
+    add dl, dh          ; dl = current shitf from left brd in bytes 
+    xor dh, dh
 
                         ; di -> 1st sym from border
     sub di, dx          ; on current string
@@ -183,7 +189,7 @@ CountLines proc
     sub si, cx              ; return si to 1st word sym
                  
     mov cx, dx              ; cx -> 1st sym after ' ' 
-    inc cl
+    dec cl
     jmp ??GoNextLine
 
 ??LongWord:
@@ -205,7 +211,7 @@ CountLines proc
 
 
 ??NewSpace:
-    mov dx, cx
+    mov dx, cx          ; 1st sym after space
     jmp ??SymLoop
 
 ??Exit:
