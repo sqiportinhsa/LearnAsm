@@ -68,7 +68,7 @@ Start:
 
     xchg cx, dx     ; cx = color, width
 
-    cmp al, 5       ; check for user style
+    cmp al, 4       ; check for user style
     jz ??UserStyle 
 
     mov bl, 9               ; size of style arr
