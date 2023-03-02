@@ -255,7 +255,12 @@ DrawLine macro
         rep stosw       ;;              cx times
         mov al, dl      ;; 1 - al, 2 - bl, 3 - dl
         stosw
-        add di, ScrWidth
+        mov cl, dh          ;; restore #inners symbols
+        add cl, 2           ;; add borders, cl = frame width in sym
+        shl cl, 1           ;; cl = frame width in bytes
+        sub di, cx          ;; di -> left border
+        add di, ScrWidth    ;; di -> next string left border
+        mov cl, dh          ;; cl = #inner symbols
 endm
 
 PrFrame proc
@@ -277,13 +282,10 @@ PrFrame proc
     mov bl, [si + 4]
     mov dl, [si + 5]
 
-??LineLoop: mov cl, dh
-            DrawLine
+??LineLoop: DrawLine
             dec bh 
             test bh, bh
             jnz ??LineLoop
-
-    mov cl, dh          ; restore count
     
     mov al, [si + 6]    ; last line
     mov bl, [si + 7]
@@ -291,8 +293,7 @@ PrFrame proc
 
     DrawLine
 
-    mov cl, dh
-    add cl, 2
+    add cl, 2           ; restore origin value
 
 ret
 endp
