@@ -107,6 +107,8 @@ WriteText proc
     cmp al, ' '
     jnz ??LongWord
 
+    inc si              ; skip printing ' '
+
     ??GoNextLine:
 
     shl dh, 1           ; dl = len of string in bytes 
@@ -157,6 +159,9 @@ CountLines proc
 
     xor dx, dx          ; dl = last ' ' pos in string
                         ; dh = last ' ' string number
+
+    dec dh              ; dh < 0 before first space
+                        ; for long word on first string case
 
     dec bh              ; count elems from 0
 
