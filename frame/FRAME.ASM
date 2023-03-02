@@ -22,14 +22,15 @@
 TextInFrame proc
 
     push bx dx si di           ; save style, width, text, len
-    mov bh, dh                 ; frame width
+    mov bh, dh                 ; bh = frame width
     sub bh, 2                  ; string len = fr wid - borders
     call CountLines                 ; call
     mov bh, dh                 ; height
     mov di, bp                 ; pos in vmem
     pop bp dx cx si            ; restore len, text, width, style
-
-
+    
+    mov cl, ch                 ; cl = frame width
+    add bh, 2                  ; table hight = #strings + borders
     push dx di                 ; text, vmem
     call PrFrame                    ; call
     mov bh, cl                 ; frame width
@@ -76,10 +77,10 @@ WriteText proc
     xor ch, ch
 
 ??LineLoop:
-    mov dh, [bp]
-    mov dl,  bh
-    sub dl, dh
-    shr dl, 1           ; dl = shift for string in sym
+    mov dh, [bp]        ; dh = str len
+    mov dl,  bh         ; dl = line len
+    sub dl, dh          ; dl = free spaces in line
+    shr dl, 1           ; dl = shift for string in sym (free / 2)
     shl dl, 1           ; dl = shift for string in bytes
     xor dh, dh          ; dx = shift for string in bytes
     add di, dx          ; di -> 1st sym of string
@@ -87,7 +88,7 @@ WriteText proc
     mov dh, [bp]        ; dh = len of string in sym
                         ; dl = shift from left border
 
-    test dx, dx
+    test dh, dh
     jz ??Exit         ; stop if end of array
 
     mov cl, dh          ; set counter = str len
@@ -208,6 +209,10 @@ CountLines proc
     jmp ??SymLoop
 
 ??Exit:
+    mov [di], cl        ; len[di] = #symbols in last string
+    inc di              
+    mov dh, ch          ; dh = amount of strings
+
     xor cx, cx
     mov [di], cx        ; end of strings len arr
     inc bh              ; return bh to origin value
@@ -240,7 +245,7 @@ endp
 ;
 ; Exit: None
 ;
-; Destroys: AL, BL, CH, DX, DI, SI
+; Destroys: AL, BX, CH, DX, DI, SI
 ;--------------------------------------------------------------------
 
 DrawLine macro 
@@ -268,9 +273,9 @@ PrFrame proc
 
     DrawLine
 
-    mov al, [si + 4]    ; inner lines
-    mov bl, [si + 5]
-    mov dl, [si + 6]
+    mov al, [si + 3]    ; inner lines
+    mov bl, [si + 4]
+    mov dl, [si + 5]
 
 ??LineLoop: mov cl, dh
             DrawLine
@@ -280,9 +285,9 @@ PrFrame proc
 
     mov cl, dh          ; restore count
     
-    mov al, [si + 7]    ; last line
-    mov bl, [si + 8]
-    mov dl, [si + 9]
+    mov al, [si + 6]    ; last line
+    mov bl, [si + 7]
+    mov dl, [si + 8]
 
     DrawLine
 

@@ -58,7 +58,8 @@ Start:
     mul bl          ; ax = pos_y * ScrWidth -> 1st byte of pos_y str
     mov bp, ax      ; bp -> 1st byte of pos_y str
     xor ah, ah
-    mov al, cl      ; ax = pos_x
+    mov al, cl      ; ax = pos_x (shift from 1 sym of scr str in sym)
+    shl ax, 1       ; ax = shift from 1 sym of scr str in bytes
     add bp, ax      ; bp -> top left corner of frame
 
     mov al, [si]    ; al = frame style num in ascii
@@ -79,6 +80,8 @@ Start:
 
     mov dx, 0b800h	        ; es -> vmem
 	mov es, dx
+    mov dh, cl              ; dh = width
+    mov ah, ch              ; ah = color
 
     mov di, offset FreeMem  ; di -> free memory
 
