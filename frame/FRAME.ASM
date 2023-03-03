@@ -243,16 +243,16 @@ endp
 ;====================================================================
 ;			 | PrFrame |
 ;--------------------------------------------------------------------
-; Prints colored rectangular frame by top left
-;                                         and lower right corners
+; Prints colored rectangular frame of given size 
+;                                        from top left corner pos
 ;--------------------------------------------------------------------
 ; Expects: es -> video memory
 ;
-; Entry: DI = top left  corner position
-; 	 SI = offset table of symbols
-;    AH = color
-;    CL = width  in symbols
-;    BH = height in symbols
+; Entry: DI = top left corner position
+; 	     SI = offset table of symbols
+;        AH = color
+;        CL = width  in symbols
+;        BH = height in symbols
 ;
 ;    table:
 ;           1------2------3
