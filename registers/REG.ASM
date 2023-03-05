@@ -31,10 +31,6 @@ Start:
 New09 proc
     push ax bx es
 
-    mov bx, 0b800h
-    mov es, bx
-    mov bx, 160*5d + 80d
-
     mov ah, 4eh
     in al, 60h          ; read from port 60h
     
@@ -44,19 +40,12 @@ New09 proc
     cmp al, 9dh         ; release ctrl code
     jz ??ReleaseCtrl
 
+    cmp al, 02h         ; press 1
+    jz ??Press1
+
     ??Continue:
 
-    in al, 61h
-    or al, 80h
-    out 61h, al
-    and al, not 80h
-    out 61h, al
-
-    mov al, 20h
-    out 20h, al
-
     pop es bx ax
-
     pushf
 
     db 09ah           ; call far
@@ -68,7 +57,11 @@ New09 proc
 ??PressCtrl:
     mov bx, offset Ctrl
     mov ax, 1
-    mov [bx], ax
+    mov cs:[bx], ax
+    
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, 5*160d + 80d
     mov ah, 0Ah
     mov es:[bx], ax
     jmp ??Continue
@@ -76,15 +69,56 @@ New09 proc
 ??ReleaseCtrl:
     mov bx, offset Ctrl
     mov ax, 0
-    mov [bx], ax
+    mov cs:[bx], ax
+
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, 5*160d + 80d
     mov ah, 0Ah
     mov es:[bx], ax
     jmp ??Continue
 
+??Press1:
+    mov bx, offset Ctrl
+    mov al, cs:[bx]
+    test al, al
+    jz ??Continue
+
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, 5*160d + 80d
+
+    push ax bx cx dx di si
+    xor di, di
+    mov si, offset Style
+    mov ah, 0Bh 
+    mov cl, 10
+    mov bh, 10
+    call PrFrame
+    pop si di dx cx bx ax
+    jmp ??Exit
+
+??Exit:
+    in al, 61h
+    or al, 80h
+    out 61h, al
+    and al, not 80h
+    out 61h, al
+
+    mov al, 20h
+    out 20h, al
+
+    pop es bx ax
+    iret
+
 endp
 ;====================================================================
 
+include FRAME.ASM
+
 Ctrl: dw 0
+
+Style db  003h, 003h, 003h, 003h, 020h, 003h, 003h, 003h, 003h
 
 ProgramEnd:
 

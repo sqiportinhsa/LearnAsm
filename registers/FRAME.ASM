@@ -90,24 +90,24 @@ PrFrame proc
 
     sub bh, 2           ; height  count for central sym
 
-    mov al, [si + 0]    ; first line
-    mov bl, [si + 1]
-    mov dl, [si + 2]
+    mov al, cs:[si + 0]    ; first line
+    mov bl, cs:[si + 1]
+    mov dl, cs:[si + 2]
 
     DrawLine
 
-    mov al, [si + 3]    ; inner lines
-    mov bl, [si + 4]
-    mov dl, [si + 5]
+    mov al, cs:[si + 3]    ; inner lines
+    mov bl, cs:[si + 4]
+    mov dl, cs:[si + 5]
 
 ??LineLoop: DrawLine
             dec bh 
             test bh, bh
             jnz ??LineLoop
     
-    mov al, [si + 6]    ; last line
-    mov bl, [si + 7]
-    mov dl, [si + 8]
+    mov al, cs:[si + 6]    ; last line
+    mov bl, cs:[si + 7]
+    mov dl, cs:[si + 8]
 
     DrawLine
 
@@ -117,6 +117,5 @@ ret
 endp
 ;====================================================================
 
-.data
-
+; data
 ScrWidth equ 160d

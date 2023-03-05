@@ -160,7 +160,7 @@ GetNum	proc
 	endp
 ;====================================================================
 
-.data
+; data
 
 HexArr db '0123456789ABCDEF'
 ScrWidth equ 160d
