@@ -29,36 +29,39 @@ Start:
 ;====================================================================
 
 New09 proc
-    push ax bx es
+    push sp ss ds es bp si di dx cx bx ax
+    mov bx, cs
+    mov ds, bx
 
     mov ah, 4eh
     in al, 60h          ; read from port 60h
     
     cmp al, 1dh         ; press ctrl code
-    jz ??PressCtrl
+    je ??PressCtrl
 
     cmp al, 9dh         ; release ctrl code
-    jz ??ReleaseCtrl
+    je ??ReleaseCtrl
 
-    cmp al, 02h         ; press 1
-    jz ??Press1
+    cmp al, 02h         ; press 1 code
+    je ??Press1
+
+    cmp al, 01          ; press esc code
+    jne ??Continue
+    jmp ??PressEsc
 
     ??Continue:
 
-    pop es bx ax
-    pushf
+    pop ax bx cx dx di si bp es ds ss sp
 
-    db 09ah           ; call far
+    db 0eah             ; call far
         Old09Ofs dw 0
         Old09Seg dw 0
-
-    iret
 
 ??PressCtrl:
     mov bx, offset Ctrl
     mov ax, 1
-    mov cs:[bx], ax
-    
+    mov [bx], ax
+
     mov bx, 0b800h
     mov es, bx
     mov bx, 5*160d + 80d
@@ -69,36 +72,92 @@ New09 proc
 ??ReleaseCtrl:
     mov bx, offset Ctrl
     mov ax, 0
-    mov cs:[bx], ax
+    mov [bx], ax
 
     mov bx, 0b800h
     mov es, bx
-    mov bx, 5*160d + 80d
+    mov bx, 5*ScrWidth + 80d
     mov ah, 0Ah
     mov es:[bx], ax
     jmp ??Continue
 
 ??Press1:
     mov bx, offset Ctrl
-    mov al, cs:[bx]
+    mov al, [bx]
     test al, al
     jz ??Continue
 
     mov bx, 0b800h
+    mov ds, bx
+    mov bx, cs
     mov es, bx
-    mov bx, 5*160d + 80d
+    xor si, si
+    mov di, offset Saved
+    cld
 
-    push ax bx cx dx di si
+    mov ax, FrHeight
+
+    ??SaveString:
+        mov cx, FrWidth
+        rep movsw
+        add si, ScrWidth - 2*FrWidth
+        dec ax
+        test ax, ax
+    jnz ??SaveString
+
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, cs
+    mov ds, bx
     xor di, di
     mov si, offset Style
     mov ah, 0Bh 
-    mov cl, 10
-    mov bh, 10
+    mov cl, FrWidth
+    mov bh, FrHeight
     call PrFrame
-    pop si di dx cx bx ax
+
+    mov ah, 10
+    mov di, ScrWidth + 4
+    call WriteRegs
+
     jmp ??Exit
 
+??PressEsc:
+    mov bx, offset Ctrl
+    mov al, [bx]
+    test al, al
+    jnz ??SkipJump
+    
+    jmp ??Continue
+    
+    ??SkipJump:
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, cs
+    mov ds, bx
+    xor di, di
+    mov si, offset Saved
+    cld
+
+    mov ax, FrHeight
+
+    ??RetString:
+        mov cx, FrWidth
+        rep movsw
+        add di, ScrWidth - 2*FrWidth
+        dec ax
+        test ax, ax
+    jnz ??RetString
+
+;   jmp ??Exit
+
 ??Exit:
+    push bx es
+    mov bx, 0b800h
+    mov es, bx
+    mov byte ptr es:[160d*24], 4eh
+    pop es bx
+
     in al, 61h
     or al, 80h
     out 61h, al
@@ -108,17 +167,22 @@ New09 proc
     mov al, 20h
     out 20h, al
 
-    pop es bx ax
+    pop ax bx cx dx di si bp es ds ss sp
     iret
 
 endp
 ;====================================================================
 
 include FRAME.ASM
+include BINHEX.ASM
 
 Ctrl: dw 0
 
+FrWidth  equ 14
+FrHeight equ 15
+
 Style db  003h, 003h, 003h, 003h, 020h, 003h, 003h, 003h, 003h
+Saved db  FrWidth*FrHeight*2 dup(0)
 
 ProgramEnd:
 

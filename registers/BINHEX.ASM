@@ -58,8 +58,8 @@ PrHex   proc
 
 ??Num:	
     mov bx, dx
-	shr bx, 0ch 		; 4 higher bits of num
-	mov al, HexArr[bx]	; get ascii code 
+	shr bx, 0ch 			; 4 higher bits of num
+	mov al, cs:HexArr[bx]	; get ascii code 
 	
 	stosw 				; move digit with color to vmem
 	shl dx, 4h 			; get next 4 higher bits
@@ -164,5 +164,3 @@ GetNum	proc
 
 HexArr db '0123456789ABCDEF'
 ScrWidth equ 160d
-
-end Start

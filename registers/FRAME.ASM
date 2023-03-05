@@ -1,44 +1,66 @@
 .code
 
 ;====================================================================
-;            | WriteReg |
+;                    | WriteRegs |
 ;--------------------------------------------------------------------
-; Prints string '<REG> = <NUM>' to screen using vmem
-; where REG is reg name (consist of 2 ascii codes) and <NUM> is 
-; value that can be stored in reg.
+; Prints all regs data in format "reg = data"
 ;--------------------------------------------------------------------
 ; Expects: ES -> video memory
-; 
+;          regs in stack in order ax bx cx dx di si bp es ds ss sp
+;
 ; Entry: ES:[DI] = position for 1st symbol
-;        BH, BL = first and second syms of REG name
-;        AH = color
-;
-; Exit: ES:[DI] -> ES:[DI] + ScrWidth
-;
-; Destroys: AL - to store sym for writing to vmem
-;           DI - moved 1 string lower
-;           BX, DX, CX - destroyed in PrHex
+;        AH      = color
+; 
+; Exit: None
+; Destroys: ax, bx, cx, dx, di, bp
 ;--------------------------------------------------------------------
+WriteRegs proc
 
-WriteSym macro SRC
-    mov al, SRC
-    stosw
+WriteReg macro REG_1, REG_2
+    irp sym, <'&REG_1&', '&REG_2&', ' ', '=', ' '>
+        mov al, sym
+        stosw
+    endm
+
+    mov dx, [bp]
+    add bp, 2
+    call PrHex          ;; destroys: BX, DX, DI, CX, AL
+
+    sub di, 12h         ;; 9 symbols was written
+    add di, ScrWidth    ;; di -> next string
 endm
 
-WriteReg proc
+    mov bp, sp
+    add bp, 2
 
-    WriteSym bh         ; A (or other reg)
-    WriteSym bl         ; X (or other reg)
-    WriteSym ' '        ; 
-    WriteSym '='        ; =
-    WriteSym ' '        ; 
+    ;write sp without macro because its lower than real 
+    irp sym, <'S', 'P', ' ', '=', ' '>
+        mov al, sym
+        stosw
+    endm
 
-    sub di, 0Ah         ; 5 symbols was written
+    mov dx, [bp]
+    add bp, 2         
+    add dx, 6           ; sp is 6 lower than before interrupt
+    call PrHex          ; destroys: BX, DX, DI, CX, AL
+
+    sub di, 12h         ; 9 symbols was written
     add di, ScrWidth    ; di -> next string
 
+    WriteReg A X
+    WriteReg B X
+    WriteReg C X 
+    WriteReg D X 
+    WriteReg D I 
+    WriteReg S I 
+    WriteReg B P 
+    WriteReg E S 
+    WriteReg D S 
+    WriteReg S S 
+    
+ret
 endp
 ;====================================================================
-
 
 ;====================================================================
 ;			 | PrFrame |
@@ -46,7 +68,7 @@ endp
 ; Prints colored rectangular frame of given size 
 ;                                        from top left corner pos
 ;--------------------------------------------------------------------
-; Expects: es -> video memory
+; Expects: es -> video memory, ds -> data segment
 ;
 ; Entry: DI = top left corner position
 ; 	     SI = offset table of symbols
@@ -90,24 +112,24 @@ PrFrame proc
 
     sub bh, 2           ; height  count for central sym
 
-    mov al, cs:[si + 0]    ; first line
-    mov bl, cs:[si + 1]
-    mov dl, cs:[si + 2]
+    mov al, [si + 0]    ; first line
+    mov bl, [si + 1]
+    mov dl, [si + 2]
 
     DrawLine
 
-    mov al, cs:[si + 3]    ; inner lines
-    mov bl, cs:[si + 4]
-    mov dl, cs:[si + 5]
+    mov al, [si + 3]    ; inner lines
+    mov bl, [si + 4]
+    mov dl, [si + 5]
 
 ??LineLoop: DrawLine
             dec bh 
             test bh, bh
             jnz ??LineLoop
     
-    mov al, cs:[si + 6]    ; last line
-    mov bl, cs:[si + 7]
-    mov dl, cs:[si + 8]
+    mov al, [si + 6]    ; last line
+    mov bl, [si + 7]
+    mov dl, [si + 8]
 
     DrawLine
 
