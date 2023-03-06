@@ -18,6 +18,19 @@ Start:
     mov es:[bx], offset New09       ; replace int09h with new
     mov ax, cs
     mov es:[bx+2], ax
+
+    xor bx, bx                      ; set es:[bx] -> int08h in table
+    mov es, bx
+    mov bx, 8*4
+
+    mov ax, es:[bx]                 ; save old int08h
+    mov [Old08Ofs], ax
+    mov ax, es:[bx+02]
+    mov [Old08Seg], ax
+ 
+    mov es:[bx], offset New08       ; replace int09h with new
+    mov ax, cs
+    mov es:[bx+2], ax
     sti
 
     mov ax, 3100h                   ; int 31h to stay in mem
@@ -71,7 +84,7 @@ New09 proc
 
 ??ReleaseCtrl:
     mov bx, offset Ctrl
-    mov ax, 0
+    xor ax, ax
     mov [bx], ax
 
     mov bx, 0b800h
@@ -86,6 +99,10 @@ New09 proc
     mov al, [bx]
     test al, al
     jz ??Continue
+
+    mov bx, offset RegsOn
+    mov ax, 1
+    mov [bx], ax
 
     mov bx, 0b800h
     mov ds, bx
@@ -105,21 +122,6 @@ New09 proc
         test ax, ax
     jnz ??SaveString
 
-    mov bx, 0b800h
-    mov es, bx
-    mov bx, cs
-    mov ds, bx
-    xor di, di
-    mov si, offset Style
-    mov ah, 0Bh 
-    mov cl, FrWidth
-    mov bh, FrHeight
-    call PrFrame
-
-    mov ah, 10
-    mov di, ScrWidth + 4
-    call WriteRegs
-
     jmp ??Exit
 
 ??PressEsc:
@@ -131,6 +133,10 @@ New09 proc
     jmp ??Continue
     
     ??SkipJump:
+    mov bx, offset RegsOn
+    xor ax, ax
+    mov [bx], ax
+
     mov bx, 0b800h
     mov es, bx
     mov bx, cs
@@ -173,10 +179,44 @@ New09 proc
 endp
 ;====================================================================
 
+;====================================================================
+New08 proc
+    push sp ss ds es bp si di dx cx bx ax
+    
+    mov bx, offset RegsOn
+    mov al, cs:[bx]
+    test al, al
+    jz ??Continue
+
+    mov bx, 0b800h
+    mov es, bx
+    mov bx, cs
+    mov ds, bx
+    xor di, di
+    mov si, offset Style
+    mov ah, 0Bh 
+    mov cl, FrWidth
+    mov bh, FrHeight
+    call PrFrame
+
+    mov ah, 10
+    mov di, ScrWidth + 4
+    call WriteRegs
+
+    ??Continue:
+    pop ax bx cx dx di si bp es ds ss sp
+
+    db 0eah             ; call far
+        Old08Ofs dw 0
+        Old08Seg dw 0
+
+endp
+;====================================================================
 include FRAME.ASM
 include BINHEX.ASM
 
 Ctrl: dw 0
+RegsOn: dw 0
 
 FrWidth  equ 14
 FrHeight equ 15
