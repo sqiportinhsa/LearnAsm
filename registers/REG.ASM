@@ -74,24 +74,12 @@ New09 proc
     mov bx, offset Ctrl
     mov ax, 1
     mov [bx], ax
-
-    mov bx, 0b800h
-    mov es, bx
-    mov bx, 5*160d + 80d
-    mov ah, 0Ah
-    mov es:[bx], ax
     jmp ??Continue
 
 ??ReleaseCtrl:
     mov bx, offset Ctrl
     xor ax, ax
     mov [bx], ax
-
-    mov bx, 0b800h
-    mov es, bx
-    mov bx, 5*ScrWidth + 80d
-    mov ah, 0Ah
-    mov es:[bx], ax
     jmp ??Continue
 
 ??Press1:
@@ -158,12 +146,6 @@ New09 proc
 ;   jmp ??Exit
 
 ??Exit:
-    push bx es
-    mov bx, 0b800h
-    mov es, bx
-    mov byte ptr es:[160d*24], 4eh
-    pop es bx
-
     in al, 61h
     or al, 80h
     out 61h, al

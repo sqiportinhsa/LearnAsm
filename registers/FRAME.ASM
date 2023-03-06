@@ -6,7 +6,8 @@
 ; Prints all regs data in format "reg = data"
 ;--------------------------------------------------------------------
 ; Expects: ES -> video memory
-;          regs in stack in order ax bx cx dx di si bp es ds ss sp
+;          regs pushed to stack in order:
+;          sp ss ds es bp si di dx cx bx ax
 ;
 ; Entry: ES:[DI] = position for 1st symbol
 ;        AH      = color
