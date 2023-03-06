@@ -168,22 +168,80 @@ New08 proc
     mov bx, offset RegsOn
     mov al, cs:[bx]
     test al, al
-    jz ??Continue
+    jnz ??RenewFrame
+
+    jmp ??Continue
+
+    ??RenewFrame:
+    ; cmp image and screen, replace changes in Saved
 
     mov bx, 0b800h
-    mov es, bx
+    mov ds, bx              ; ds -> video segment
     mov bx, cs
-    mov ds, bx
-    xor di, di
-    mov si, offset Style
-    mov ah, 0Bh 
+    mov es, bx              ; es -> code segment
+
+    xor si, si              ; ds:[si] -> frame
+    mov di, offset Image    ; es:[di] -> image
+    mov bx, offset Saved    ; es:[bx] -> Saved
+
+    mov ax, FrHeight
+    mov cx, FrWidth*2
+    cld
+
+    ??CmpString:
+            mov dl,    [si]
+            mov dh, es:[di]
+            cmp dl, dh
+            je ??SkipReplace
+                mov es:[bx], dl     ; update byte in Saved
+            ??SkipReplace:
+            inc si
+            inc bx
+            inc di
+        loop ??CmpString
+        mov cx, FrWidth*2
+        add si, ScrWidth - FrWidth*2    ; si -> next line
+        add di, ScrWidth - FrWidth*2    ; di -> next line
+        dec ax
+        test ax, ax
+    jnz ??CmpString
+
+    ; draw new image
+
+    mov bx, cs
+    mov ds, bx              ; ds -> code segment
+    mov di, offset Image    ; es:[di] -> Image
+    mov si, offset Style    ; ds:[si] -> Style
+    mov ah, 0Bh             ; ah = color
     mov cl, FrWidth
-    mov bh, FrHeight
+    mov bh, FrHeight - 2
     call PrFrame
 
     mov ah, 10
-    mov di, ScrWidth + 4
+    mov di, offset Image + ScrWidth + 4
     call WriteRegs
+
+    ; replace screen with image
+
+    mov bx, 0b800h
+    mov es, bx              ; es -> video segment
+
+    xor di, di              ; es:[di] -> frame
+    mov si, offset Image    ; ds:[di] -> image
+
+    mov ax, FrHeight
+    mov cx, FrWidth
+    cld
+
+    ??RepStrings:
+        mov cx, FrWidth
+        rep movsw
+        add si, ScrWidth - FrWidth*2    ; si -> next line
+        add di, ScrWidth - FrWidth*2    ; di -> next line
+        dec ax
+        test ax, ax
+    jnz ??RepStrings
+
 
     ??Continue:
     pop ax bx cx dx di si bp es ds ss sp
@@ -199,12 +257,14 @@ include BINHEX.ASM
 
 Ctrl: dw 0
 RegsOn: dw 0
+Easter: dw 0
 
 FrWidth  equ 14
 FrHeight equ 15
 
 Style db  003h, 003h, 003h, 003h, 020h, 003h, 003h, 003h, 003h
 Saved db  FrWidth*FrHeight*2 dup(0)
+Image db  ScrWidth*25*2 dup(0)
 
 ProgramEnd:
 

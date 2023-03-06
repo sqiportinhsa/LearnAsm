@@ -34,20 +34,6 @@ endm
     mov bp, sp
     add bp, 2
 
-    ;write sp without macro because its lower than real 
-    irp sym, <'S', 'P', ' ', '=', ' '>
-        mov al, sym
-        stosw
-    endm
-
-    mov dx, [bp]
-    add bp, 2         
-    add dx, 6           ; sp is 6 lower than before interrupt
-    call PrHex          ; destroys: BX, DX, DI, CX, AL
-
-    sub di, 12h         ; 9 symbols was written
-    add di, ScrWidth    ; di -> next string
-
     WriteReg A X
     WriteReg B X
     WriteReg C X 
@@ -58,6 +44,17 @@ endm
     WriteReg E S 
     WriteReg D S 
     WriteReg S S 
+
+    ;write sp without macro because its lower than real 
+    irp sym, <'S', 'P', ' ', '=', ' '>
+        mov al, sym
+        stosw
+    endm
+
+    mov dx, [bp]
+    add bp, 2         
+    add dx, 6           ; sp is 6 lower than before interrupt
+    call PrHex          ; destroys: BX, DX, DI, CX, AL
     
 ret
 endp
