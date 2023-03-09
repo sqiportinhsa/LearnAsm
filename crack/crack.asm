@@ -11,20 +11,20 @@ GetSym macro
     cmp al, 0dh                     ; check for end of line
 endm
 
-    xor cl, cl                      ; set len counter
+    xor cl, cl                      ; set len counter (cl = len // 2)
 
     mov si, offset CorrectPassword
-    add si, PasswordLen
+    add si, PasswordLen - 2
     std 
 
 ??GetPassSym:
     GetSym
     je ??CheckLoop
-    mov bh, al
+    mov bl, al
     inc cl
     GetSym
     je ??OddLen
-    mov bl, al
+    mov bh, al
     push bx                         ; store symbols in stack
 jmp ??GetPassSym
 
@@ -37,19 +37,18 @@ jmp ??GetPassSym
 ??CheckLoop:
     test cl, cl
     je ??Success
-    lodsw
     pop bx
+    lodsw
     cmp ax, bx
     jne ??Denied
-    sub cl, 2
+    dec cl
 jmp ??CheckLoop
 
 ??Success:
     mov ax, 0b800h
     mov es, ax
-    mov di, 160d*15 + 160d/2
+    mov di, 160d*20 + 160d/2 - 10d
     xor si, si
-    mov ah, 12h
     mov cx, SuccessStrLen
     mov ah, 0Ah
     cld
@@ -67,9 +66,8 @@ jmp ??CheckLoop
 ??Denied:
     mov ax, 0b800h
     mov es, ax
-    mov di, 160d*15 + 160d/2
+    mov di, 160d*20 + 160d/2 - 10d
     xor si, si
-    mov ah, 12h
     mov cx, DeniedStrLen
     mov ah, 0Ch
     cld
@@ -149,8 +147,8 @@ LoseString db "You lost The Game"
 DeniedStr  db "Access denied"
 SuccessStr db "Access allowed"
 
-CorrectPassword db "1111"
-PasswordLen equ 15
+CorrectPassword db "123456"
+PasswordLen equ 6
 
 LoseStrLen    equ 17
 DeniedStrLen  equ 13
