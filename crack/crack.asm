@@ -19,11 +19,11 @@ endm
 
 ??GetPassSym:
     GetSym
-    je ??CheckLoop
+    je ??CheckLoop                  ; if len is even
     mov bl, al
     inc cl
     GetSym
-    je ??OddLen
+    je ??OddLen                     ; if len is odd
     mov bh, al
     push bx                         ; store symbols in stack
 jmp ??GetPassSym
@@ -78,24 +78,21 @@ jmp ??CheckLoop
         inc si
     loop ??WriteDenied
 
-    mov ax, 4c00h	; exit(0)
-	int 21h
+    cli                             ; set es:[bx] -> int09h in table
+    xor bx, bx
+    mov es, bx
+    mov bx, 9*4
+ 
+    mov es:[bx], offset New09       ; replace int09h with new
+    mov ax, cs
+    mov es:[bx+2], ax
+    sti
 
-    ;cli                             ; set es:[bx] -> int09h in table
-    ;xor bx, bx
-    ;mov es, bx
-    ;mov bx, 9*4
- ;
-    ;mov es:[bx], offset New09       ; replace int09h with new
-    ;mov ax, cs
-    ;mov es:[bx+2], ax
-    ;sti
-;
-    ;mov ax, 3100h                   ; int 21h with 31 code to stay in mem
-    ;mov dx, offset ProgramEnd       ; calc programm size
-    ;shr dx, 4
-    ;inc dx
-    ;int 21h
+    mov ax, 3100h                   ; int 21h with 31 code to stay in mem
+    mov dx, offset ProgramEnd       ; calc programm size
+    shr dx, 4
+    inc dx
+    int 21h
 
 ;==============================================================================
 New09 proc
@@ -103,7 +100,7 @@ New09 proc
     push sp ss ds es bp si di dx cx bx ax
 
     mov ax, cs
-    mov ds, bx
+    mov ds, ax
     mov si, offset LoseString   ; ds:[si] -> LoseString
     mov ax, 0b800h
     mov es, ax
@@ -117,10 +114,11 @@ New09 proc
     cmp al, 80h             ; check if press key
     js ??SetPressColor
     
-    mov ah, 1Ah
+    mov ah, 1Ch
 
     ??LoadLoseString:
-        lodsb
+        mov al, [si]
+        inc si
         stosw
     loop ??LoadLoseString
 
@@ -147,8 +145,8 @@ LoseString db "You lost The Game"
 DeniedStr  db "Access denied"
 SuccessStr db "Access allowed"
 
-CorrectPassword db "123456"
-PasswordLen equ 6
+CorrectPassword db "JustPassword"
+PasswordLen equ 12
 
 LoseStrLen    equ 17
 DeniedStrLen  equ 13
