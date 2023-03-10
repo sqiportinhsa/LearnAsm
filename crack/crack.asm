@@ -11,6 +11,24 @@ GetSym macro
     cmp al, 0dh                     ; check for end of line
 endm
 
+    mov bx, offset ??StartOfShield
+    mov cx, offset ??EndOfShield
+    sub cx, bx
+    xor dx, dx
+    xor ax, ax
+
+    ??CalcHash:
+        mov byte ptr ax, [bx]
+        add dx, ax
+        inc bx
+    loop ??CalcHash
+
+    mov ax, PrHash
+    cmp ax, dx
+    jne ??Denied
+
+??StartOfShield:
+
     xor cl, cl                      ; set len counter (cl = len // 2)
 
     mov si, offset CorrectPassword
@@ -94,6 +112,8 @@ jmp ??CheckLoop
     inc dx
     int 21h
 
+??EndOfShield:
+
 ;==============================================================================
 New09 proc
 
@@ -146,11 +166,13 @@ DeniedStr  db "Access denied"
 SuccessStr db "Access allowed"
 
 CorrectPassword db "JustPassword"
-PasswordLen equ 12
+PasswordLen equ 12d
 
-LoseStrLen    equ 17
-DeniedStrLen  equ 13
-SuccessStrLen equ 14
+LoseStrLen    equ 17d
+DeniedStrLen  equ 13d
+SuccessStrLen equ 14d
+
+PrHash equ 0A63Ah
 
 ProgramEnd:
 
