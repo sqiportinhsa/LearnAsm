@@ -1,0 +1,3 @@
+[submodule "YanCrack/cracker/stb"]
+	path = YanCrack/cracker/stb
+	url = https://github.com/nothings/stb
