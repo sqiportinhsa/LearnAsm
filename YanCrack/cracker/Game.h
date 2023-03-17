@@ -33,15 +33,14 @@ struct Gifs {
     GIF *cat_left;
     GIF *cat_right;
     GIF *cat_up;
-    GIF *cat_down1;
-    GIF *cat_down2;
+    GIF *cat_down;
     GIF *cat_wait;
     GIF *cat_sleep;
 };
 
 
 struct Game {
-    sf::RenderWindow window;
+    sf::RenderWindow *window;
     sf::Sprite  maze[ARRAY_SIZE];
     sf::Sprite  cat;
     size_t      cat_index;

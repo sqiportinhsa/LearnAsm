@@ -6,7 +6,7 @@
 
 #include "stb/stb_image.h"
 
-static Game *init();
+static Game *init(sf::RenderWindow *window);
 static bool check_exit(Game *game);
 static void move_cat(Game *game, Direction direction);
 static GIF* get_gif_frames(const char *catgif, int vert_size, int hor_size);
@@ -15,15 +15,16 @@ static void draw_maze(Game *game);
 static void celebrate_win(Game *game);
 
 bool run_game() {
-	Game *game = init();
+	sf::RenderWindow window(sf::VideoMode(SCREEN_SIZE, SCREEN_SIZE), "", sf::Style::None);
+	Game *game = init(&window);
 	sf::Event event;
 	Direction direction = Direction::Nope;
 	
 	while (!game->solved) {
-		while (game->window.pollEvent(event)) {
+		while (game->window->pollEvent(event)) {
             // stop if window closed
             if (event.type == sf::Event::Closed) {
-                game->window.close();
+                game->window->close();
 				return false;
             }
 
@@ -44,7 +45,7 @@ bool run_game() {
 						direction = Direction::Down;
 						break;
 					case sf::Keyboard::Escape:
-						game->window.close();
+						game->window->close();
 						return false;
 					default:
 						break;
@@ -59,34 +60,35 @@ bool run_game() {
 	}
 
 	celebrate_win(game);
-
+	game->window->close();
+	return true;
 }
 
-static Game *init() {
+static Game *init(sf::RenderWindow *window) {
 	Game *game = (Game*) calloc(1, sizeof(Game));
-	
+
 	// Init main window and set it's position to higher left point
-    game->window.create(sf::VideoMode(SCREEN_SIZE, SCREEN_SIZE), "OpenGL", sf::Style::None);
-    game->window.setPosition(sf::Vector2i(0, 0));
-	
+	game->window = window;
+    game->window->setPosition(sf::Vector2i(0, 0));
+
 	// Подгружаем шрифт
 	// game->font.loadFromFile("calibri.ttf");
 
 	// load textures
-    game->text.wall.loadFromFile("images/wall1.webp.png");
-	game->text.space.loadFromFile("images/space.png");
+    game->text.wall.loadFromFile("cracker/images/wall1.webp.png");
+	game->text.space.loadFromFile("cracker/images/space.png");
 
 	// load gifs
-	game->gifs.cat_left  = get_gif_frames("images/left.gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_down1 = get_gif_frames("images/down1.gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_down2 = get_gif_frames("images/down2.gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_right = get_gif_frames("images/right/gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_up    = get_gif_frames("images/up.gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_sleep = get_gif_frames("images/sleep.gif", MAZE_SIZE, MAZE_SIZE);
-	game->gifs.cat_wait  = get_gif_frames("images/wait.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_left  = get_gif_frames("cracker/images/left.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_down  = get_gif_frames("cracker/images/down.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_right = get_gif_frames("cracker/images/right.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_up    = get_gif_frames("cracker/images/up.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_sleep = get_gif_frames("cracker/images/down.gif", MAZE_SIZE, MAZE_SIZE);
+	game->gifs.cat_wait  = get_gif_frames("cracker/images/wait.gif", MAZE_SIZE, MAZE_SIZE);
 
 	// Заполняем лабиринт
 	for (int i = 0; i < ARRAY_SIZE - 1; i++) {
+		game->maze[i] = sf::Sprite();
 		if (Maze[i] == TileType::SPACE) game->maze[i].setTexture(game->text.wall);
 		if (Maze[i] == TileType::WALL)  game->maze[i].setTexture(game->text.space);
 
@@ -96,6 +98,8 @@ static Game *init() {
 	// Ставим котика в левую верхнюю позицию
 	game->cat_index = MAZE_SIZE + 1;
 	game->solved = false;
+
+	return game;
 }
 
 static bool check_exit(Game *game) {
@@ -127,7 +131,7 @@ static void move_cat(Game *game, Direction direction) {
 			move_index = game->cat_index + MAZE_SIZE;
 			break;
 		case Direction::Down:
-			catgif = game->gifs.cat_down1;
+			catgif = game->gifs.cat_down;
 			move_index = game->cat_index - MAZE_SIZE;
 			break;
 	}
@@ -151,18 +155,21 @@ static void move_cat(Game *game, Direction direction) {
 static void draw_catgif(Game *game, GIF *catgif) {
 	// Покадровая отрисовка гифки с котом
 	for (int i = 0; i < catgif->size; ++i) {
+		game->window->clear();
 		game->maze[game->cat_index].setTexture(catgif->arr[i].frame);
-		game->window.draw(game->maze[game->cat_index]);
 		draw_maze(game);
+		game->window->draw(game->maze[game->cat_index]);
 		usleep(catgif->arr[i].delay);
+		game->window->display();
 	}
 }
 
 static void draw_maze(Game *game) {
 	// Поклеточная отрисовка лабиринта
+	sf::RenderWindow win1(sf::VideoMode(SCREEN_SIZE, SCREEN_SIZE), "", sf::Style::None);
 	for (size_t i = 0; i < ARRAY_SIZE; ++i) {
 		for (int i = 0; i < ARRAY_SIZE - 1; i++) {
-			if (i != game->cat_index) game->window.draw(game->maze[i]);
+			if (i != game->cat_index) win1.draw(game->maze[i]);
 		}
 	}
 
