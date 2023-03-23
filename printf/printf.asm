@@ -8,8 +8,10 @@ _start:
         mov rdx, MsgLen
         syscall
 
-        push 0x1A4
-        push 8
+        push 10
+        push 10
+        push 10
+        push 10
         push String
         push Msg
         call Printf
@@ -17,6 +19,9 @@ _start:
         pop rax
         pop rax
         pop rax
+        pop rax
+        pop rax
+
 
         mov rax, 0x3c
         xor rdi, rdi
@@ -24,7 +29,7 @@ _start:
 
 ;---------------------------------------------------------------------------------------------------
 
-; done: char bin dec hex
+; done: char bin dec hex str 
 
 section .data
     HigherByteMask  equ 0xFF000000
@@ -36,7 +41,7 @@ section .data
     DecBuf  db MaxDecLen dup(0)
     StrBuf  db buf_size  dup(0)
 
-    Msg:   db "hehe %s %b %x he", 0x0a
+    Msg:   db "hehe %% %s %d %b %o %x he", 0x0a
     MsgLen equ $ - Msg
 
     String db "i wanna sleep", 0x0a
@@ -81,10 +86,14 @@ Printf:
 
         inc rsi                         ; get argument format
         mov al, [rsi]
+
+        cmp al, '%'                     ; check for "%%" - output of "%"
+        je .load_to_buf                 ; first skipped, print second
+
         sub al, 'b'                     ; index in table = ascii of form - ascii of b
         call [call_table + rax*8]
-        add rbp, 8
-        inc rsi
+        add rbp, 8                      ; go to next arg in stack
+        inc rsi                         ; go to next sym in string
         jmp .get_sym
 
         .load_to_buf:
@@ -339,7 +348,7 @@ ret
 PrintfOct:
 
     mov rax, rbx
-    add rax, buf_size + 4*8 + 1         ; ax = max pos in buf after writing (0 + 4 sym per byte)
+    add rax, buf_size + 3*8 + 1         ; ax = max pos in buf after writing (0 + 8/3 sym per byte)
     cmp rdi, rax                        ; check if buffer fits string + char
     js .skip_dump                       ; if fits continue writing to buf without dump
 
@@ -349,7 +358,7 @@ PrintfOct:
 
     .skip_dump: 
     mov rdx, [rbp]
-    mov rcx, 8                          ; reg number has 8 bytes, common counter 
+    mov rcx, 8*8                        ; reg number has 8 bytes, common counter 
                                         ; for skip high zero bytes and write non-zero bytes.
                                         ; for zero 8 skips and 1 writing of zero
 
@@ -362,17 +371,19 @@ PrintfOct:
         test r9, r9                     ; check higher byte for zero
         jnz .break                      ; stop if not zero byte found
         shl rdx, 8                      ; skip zero byte
-    loop .skip_high_zero
+        sub rcx, 8
+    jmp .skip_high_zero
 
-    .break: shl rcx, 1                  ; rcx *= 2 (rcx: byte counter -> 4-bit counter)
+    .break:
 
     .write:
         mov rax, rdx
-        shr rax, 8*7 + 4                ; rax = al = higher 4 bits of rdx
+        shr rax, 8*7 + 6                ; rax = al = higher 3 bits of rdx
         add al, '0'                     ; al := ascii code of num in al
         stosb
-        shl rdx, 4                      ; go to next 4 bits
-    loop .write
+        shl rdx, 3                      ; go to next 3 bits
+        sub rcx, 3
+    jnc .write
 
 ret
 
@@ -412,33 +423,5 @@ PrintfString:
     jmp .external_loop
     
     .break: mov rsi, r8
-
-ret
-
-;===================================================================================================
-;                                       PrintfPerc
-;---------------------------------------------------------------------------------------------------
-; proc for %% format output
-;---------------------------------------------------------------------------------------------------
-; Input: rbx -> start of buffer
-;        rdi -> end of buffer
-; Exit:  rdi, rbx -> start of buffer
-; Destroy: rax, rdx, rsi
-;---------------------------------------------------------------------------------------------------
-
-PrintfPerc:
-
-    mov rax, rbx
-    add rax, buf_size + 1           ; ax = pos in buf after char writing
-    cmp rdi, rax                    ; check if buffer fits string + char
-    js .skip_dump                   ; if fits continue writing to buf without dump
-
-    mov r8, rsi                     ; save rsi
-    call DumpBuf                    ; dump buffer
-    mov rsi, r8                     ; restore rsi
-
-    .skip_dump:
-    mov al, '%'
-    stosb
 
 ret
