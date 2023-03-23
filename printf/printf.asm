@@ -8,24 +8,110 @@ _start:
         mov rdx, MsgLen
         syscall
 
+        push 0x1A4
+        push 8
+        push String
+        push Msg
+        call Printf
+        pop rax
+        pop rax
+        pop rax
+        pop rax
+
         mov rax, 0x3c
         xor rdi, rdi
         syscall
 
-section .rodata
-    Msg:   db "helloworldhehe", 0x0a
-    MsgLen equ $ - Msg
+;---------------------------------------------------------------------------------------------------
 
-    HigherByteMask     equ 0xFF00000000000000
-    TwoHigherBytesMask equ 0xFFFF000000000000
+; done: char bin dec hex
+
+section .data
+    HigherByteMask  equ 0xFF000000
 
     MaxDecLen equ 20
+    buf_size  equ 256
 
     HexArr: db "0123456789ABCDEF"
-    DecBuf: times MaxDecLen db 0
+    DecBuf  db MaxDecLen dup(0)
+    StrBuf  db buf_size  dup(0)
+
+    Msg:   db "hehe %s %b %x he", 0x0a
+    MsgLen equ $ - Msg
+
+    String db "i wanna sleep", 0x0a
 
 section .text
 
+;===================================================================================================
+;                                       Printf
+;---------------------------------------------------------------------------------------------------
+; Same func as printfs from stdio.h
+;---------------------------------------------------------------------------------------------------
+; Input: format srt and arguments in stack
+;---------------------------------------------------------------------------------------------------
+
+Printf:
+    lea rbp, [rsp + 8*1]                ; rbp -> 1st arg in stack (format line)
+    mov rsi, [rbp]                      ; rsi -> format line
+    lea rbp, [rsp + 8*2]                ; rbp -> 2nd arg
+
+    mov rbx, StrBuf
+    mov rdi, StrBuf
+
+    .get_sym:
+        mov rax, rbx
+        add rax, buf_size + 1           ; ax = pos in buf after char writing
+        cmp rdi, rax                    ; check if buffer fits string + char
+        js .skip_dump                   ; if fits continue writing to buf without dump
+
+        mov r8, rsi                     ; save rsi
+        call DumpBuf                    ; dump buffer
+        mov rsi, r8                     ; restore rsi
+
+        .skip_dump:
+        xor rax, rax
+        mov al, [rsi]                   ; load next sym of format str
+
+        cmp al, 0x0a                    ; check for end of str
+        je .end
+
+        cmp al, '%'                     ; check for argument
+        jne .load_to_buf                ; load ordinary symbol if not %
+
+        inc rsi                         ; get argument format
+        mov al, [rsi]
+        sub al, 'b'                     ; index in table = ascii of form - ascii of b
+        call [call_table + rax*8]
+        add rbp, 8
+        inc rsi
+        jmp .get_sym
+
+        .load_to_buf:
+
+        stosb
+        inc rsi
+        jmp .get_sym
+
+    .end: 
+        call DumpBuf
+ret
+
+;---------------------------------------------------------------------------------------------------
+
+
+section .rodata
+    call_table dq PrintfBin
+               dq PrintfChar
+               dq PrintfDec
+               dq 10 dup(0)
+               dq PrintfOct
+               dq 3 dup(0)
+               dq PrintfString
+               dq 4 dup(0)
+               dq PrintfHex
+
+section .text
 ;===================================================================================================
 ;                                       DumpBuf
 ;---------------------------------------------------------------------------------------------------
@@ -39,14 +125,14 @@ section .text
 
 DumpBuf:
 
+    mov rdx, rdi                    
+    sub rdx, rbx                    ; calculate msg len
+    mov rsi, rbx                    ; rsi -> start of buffer
     mov rax, 0x01                   ; prepare write syscall
     mov rdi, 0x01
-    mov rsi, rbx                    ; rsi -> start of buffer
-    mov rdx, rdi                    
-    sub rdx, rdi                    ; calculate msg len
     syscall
 
-    mov rdi, rdb                    ; rdi -> start of buffer
+    mov rdi, rbx                    ; rdi -> start of buffer
 ret
 
 ;===================================================================================================
@@ -73,7 +159,7 @@ PrintfChar:
     mov rsi, r8                     ; restore rsi
 
     .skip_dump:
-    pop rax
+    mov rax, [rbp]
     stosb
 
 ret
@@ -93,37 +179,43 @@ ret
 PrintfDec:
 
     mov rcx, MaxDecLen
-    mov r8, rsi
-    mov rsi, DumpBuf
-    pop rax
+    mov r8, rdi
+    mov rdi, DecBuf
+    mov rax, [rbp]
+    mov r9, 0x0A
 
     .digit_loop:
         xor rdx, rdx                ; complement rax to 2 regs
-        div 0xA                     ; rdx := num % 10
+        div r9                      ; rdx := num % 10
                                     ; rax := num // 10
 
-        xchg rdx, rax               ; rax = al = digit
-        add al, '0'                 ; al = digit ascci code
+        xchg rdx, rax               ; rax = al = digit, rdx = num // 10
+        add al, '0'                 ; al = digit asccii code
         stosb
-        xchg rdx, rax
+        xchg rdx, rax               ; rax = num // 10 = new num
     loop .digit_loop
 
-    mov rcx, rsi
-    sub rcx, DumpBuf                ; calc len of dec format
+    mov rcx, rdi
+    sub rcx, DecBuf                 ; calc len of dec format
+    dec rdi
 
     .skip_high_zero:
-        mov al, [rsi]
+        mov al, [rdi]
         cmp al, '0'
-        jnz .load_number
-        dec rsi
+        jnz .break
+        dec rdi
     loop .skip_high_zero
 
+    .break:
+    xchg r8, rdi                    ; r8  -> DecBuf end, rdi -> StrBuf
+    xchg r8, rsi                    ; rsi -> DecBuf end, r8  -> Format String
     .load_number:
         mov al, [rsi]
         stosb
         dec rsi
     loop .load_number
 
+    mov rsi, r8
 ret
 
 
@@ -136,7 +228,7 @@ ret
 ;          rdi -> end of buffer
 ; Exit:    rbx -> start of buffer
 ;          rdi -> new end of buffer
-; Destroy: rax, rcx, rdx
+; Destroy: rax, rcx, rdx, r9
 ;---------------------------------------------------------------------------------------------------
 
 PrintfBin:
@@ -151,13 +243,15 @@ PrintfBin:
     mov rsi, r8                     ; restore rsi
 
     .skip_dump:
-    pop rdx
+    mov rdx, [rbp]
     mov rcx, 8                      ; reg number has 8 bytes, common counter 
                                     ; for skip high zero bytes and write non-zero bytes
                                     ; for zero 8 skips and 1 writing of zero
     
     .skip_high_zero:
-        test rdx, HigherByteMask    ; check higher byte for zero
+        mov r9, rdx
+        shr r9, 7*8                 ; r9 = higher byte of rdx
+        test r9, r9                 ; check higher byte for zero
         jnz .break                  ; stop if not zero byte found
         shl rdx, 8                  ; skip zero byte
     loop .skip_high_zero
@@ -166,10 +260,10 @@ PrintfBin:
 
     .write:
         mov rax, rdx
-        shr rax, 4*8 - 1            ; higher bit of rax
+        shr rax, 8*8 - 1            ; higher bit of rax
         add al, '0'                 ; get acsii code of 0 or 1 in rax
         stosb                       ; write to buffer
-        shl rax, 1                  ; go to next bit
+        shl rdx, 1                  ; go to next bit
     loop .write
 
 ret
@@ -184,7 +278,7 @@ ret
 ;          rdi -> end of buffer
 ; Exit:    rbx -> start of buffer
 ;          rdi -> new end of buffer
-; Destroy: rax, rcx, rdx, r8
+; Destroy: rax, rcx, rdx, r8, r9
 ;---------------------------------------------------------------------------------------------------
 
 PrintfHex:
@@ -200,7 +294,7 @@ PrintfHex:
     mov rsi, r8                         ; restore rsi
 
     .skip_dump: 
-    pop rdx 
+    mov rdx, [rbp]
     mov rcx, 8                          ; reg number has 8 bytes, common counter 
                                         ; for skip high zero bytes and write non-zero bytes.
                                         ; for zero 8 skips and 1 writing of zero
@@ -211,7 +305,9 @@ PrintfHex:
     stosb
     
     .skip_high_zero:
-        test rdx, HigherByteMask        ; check 2 higher byte for zero
+        mov r9, rdx
+        shr r9, 7*8                     ; r9 = higher byte of rdx
+        test r9, r9                     ; check higher byte for zero
         jnz .break                      ; stop if not zero byte found
         shl rdx, 8                      ; skip zero byte
     loop .skip_high_zero
@@ -223,7 +319,7 @@ PrintfHex:
         shr r8, 8*7 + 4                 ; r8 = higher 4 bits of rdx
         mov al, [HexArr + r8]           ; get ascii of byte in r8
         stosb
-        shl rax, 4                      ; go to next 4 bits
+        shl rdx, 4                      ; go to next 4 bits
     loop .write
 
 ret
@@ -237,7 +333,7 @@ ret
 ;          rdi -> end of buffer
 ; Exit:    rbx -> start of buffer
 ;          rdi -> new end of buffer
-; Destroy: rax, rcx, rdx, r8
+; Destroy: rax, rcx, rdx, r8, r9
 ;---------------------------------------------------------------------------------------------------
 
 PrintfOct:
@@ -252,7 +348,7 @@ PrintfOct:
     mov rsi, r8                         ; restore rsi
 
     .skip_dump: 
-    pop rdx 
+    mov rdx, [rbp]
     mov rcx, 8                          ; reg number has 8 bytes, common counter 
                                         ; for skip high zero bytes and write non-zero bytes.
                                         ; for zero 8 skips and 1 writing of zero
@@ -261,7 +357,9 @@ PrintfOct:
     stosb
     
     .skip_high_zero:
-        test rdx, HigherByteMask        ; check higher byte for zero
+        mov r9, rdx
+        shr r9, 7*8                     ; r9 = higher byte of rdx
+        test r9, r9                     ; check higher byte for zero
         jnz .break                      ; stop if not zero byte found
         shl rdx, 8                      ; skip zero byte
     loop .skip_high_zero
@@ -273,7 +371,7 @@ PrintfOct:
         shr rax, 8*7 + 4                ; rax = al = higher 4 bits of rdx
         add al, '0'                     ; al := ascii code of num in al
         stosb
-        shl rax, 4                      ; go to next 4 bits
+        shl rdx, 4                      ; go to next 4 bits
     loop .write
 
 ret
@@ -296,12 +394,12 @@ PrintfString:
     add rcx, buf_size
     sub rcx, rdi                    ; cx = avaible space in buffer
     mov r8, rsi                     ; save rsi
-    pop rsi                         ; rsi -> start of string
+    mov rsi, [rbp]                  ; rsi -> start of string
     
     .external_loop:
         .internal_loop:             ; copy str to buf till full buf or end of str
             lodsb
-            cmp al, '$'
+            cmp al, 0x0a
             je .break
             stosb
         loop .internal_loop
