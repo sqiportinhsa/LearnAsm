@@ -8,10 +8,10 @@ _start:
         mov rdx, MsgLen
         syscall
 
-        push 10
-        push 10
-        push 10
-        push 10
+        push -1
+        push -1
+        push -1
+        push -1
         push String
         push Msg
         call Printf
@@ -187,11 +187,35 @@ ret
 
 PrintfDec:
 
-    mov rcx, MaxDecLen
-    mov r8, rdi
-    mov rdi, DecBuf
-    mov rax, [rbp]
-    mov r9, 0x0A
+    mov rax, rbx
+    add rax, buf_size + MaxDecLen   ; ax = max pos in buf after writing (8 sym per byte)
+    cmp rdi, rax                    ; check if buffer fits string + bin num
+    js .skip_dump                   ; if fits continue writing to buf without dump
+
+    mov r8, rsi                     ; save rsi
+    call DumpBuf                    ; dump buffer
+    mov rsi, r8                     ; restore rsi
+
+    .skip_dump: 
+    mov rax, [rbp]                  ; get number from stack
+    mov rdx, rax
+
+    shr rdx, 8*8 - 1                ; get sign bit of num
+    test rdx, rdx                   ; if sign bit = 0 skip writing '-'
+    je .skip_sign        
+
+    mov rdx, rax                    ; save num in rdx
+    mov al, '-'                     ; write "-" to strbuf
+    stosb
+    mov rax, rdx                    ; restore num in rax
+    not rax                         ; num = -num - 1
+    inc rax                         ; num = -num
+    
+    .skip_sign:                     ; after skipping or without it positive num to write is in rax
+    mov rcx, MaxDecLen              ; set counter
+    mov r8, rdi                     ; save rdi
+    mov rdi, DecBuf                 ; write reversed num to special buffer
+    mov r9, 0x0A                    ; set r9 = 10 to divide
 
     .digit_loop:
         xor rdx, rdx                ; complement rax to 2 regs
