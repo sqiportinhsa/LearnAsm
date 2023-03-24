@@ -372,7 +372,7 @@ ret
 PrintfOct:
 
     mov rax, rbx
-    add rax, buf_size + 3*8 + 1         ; ax = max pos in buf after writing (0 + 8/3 sym per byte)
+    add rax, buf_size + 22 + 1          ; ax = max pos in buf after writing (max 22 for num + '0')
     cmp rdi, rax                        ; check if buffer fits string + char
     js .skip_dump                       ; if fits continue writing to buf without dump
 
@@ -382,32 +382,41 @@ PrintfOct:
 
     .skip_dump: 
     mov rdx, [rbp]
-    mov rcx, 8*8                        ; reg number has 8 bytes, common counter 
+    mov rcx, 8*8 - 1                    ; reg number has 8 bytes, skip higher 
                                         ; for skip high zero bytes and write non-zero bytes.
                                         ; for zero 8 skips and 1 writing of zero
 
     mov al, '0'                         ; write "0" for oct output start   
     stosb
-    
+
+    mov r9, rdx
+    shr r9, 8*8 - 1                     ; write higher bit separately (64 = 1 + 21*3)
+    shl rdx, 1                          ; skip higher bit
+    test r9, r9                         ; if higher bit is zero processing is unneeded
+    je .skip_high_zero 
+
+    mov al, '1'                         ; higher byte \neq 0 \Leftarrow higher byte = 1, write 1
+    stosb
+
     .skip_high_zero:
         mov r9, rdx
-        shr r9, 7*8                     ; r9 = higher byte of rdx
-        test r9, r9                     ; check higher byte for zero
-        jnz .break                      ; stop if not zero byte found
-        shl rdx, 8                      ; skip zero byte
-        sub rcx, 8
+        shr r9, 8*8 - 3                 ; r9 = higher 3 bits
+        test r9, r9                     ; check it for zero
+        jnz .break                      ; stop if not zero bits found
+        shl rdx, 3                      ; skip zero bits
+        sub rcx, 3
     jmp .skip_high_zero
 
     .break:
 
     .write:
         mov rax, rdx
-        shr rax, 8*7 + 6                ; rax = al = higher 3 bits of rdx
+        shr rax, 8*8 - 3                ; rax = al = higher 3 bits of rdx
         add al, '0'                     ; al := ascii code of num in al
         stosb
         shl rdx, 3                      ; go to next 3 bits
         sub rcx, 3
-    jnc .write
+    jne .write
 
 ret
 
