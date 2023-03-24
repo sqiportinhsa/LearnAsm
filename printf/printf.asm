@@ -8,9 +8,16 @@ _start:
         mov rdx, MsgLen
         syscall
 
+        push 127
+        push 33
+        push 100
+        push 3802
+        push love
         push -1
-        push -1
-        push -1
+        push 0x30
+        push 1
+        push 1
+        push 1
         push -1
         push String
         push Msg
@@ -21,15 +28,13 @@ _start:
         pop rax
         pop rax
         pop rax
-
+        pop rax
 
         mov rax, 0x3c
         xor rdi, rdi
         syscall
 
 ;---------------------------------------------------------------------------------------------------
-
-; done: char bin dec hex str 
 
 section .data
     HigherByteMask  equ 0xFF000000
@@ -41,10 +46,11 @@ section .data
     DecBuf  db MaxDecLen dup(0)
     StrBuf  db buf_size  dup(0)
 
-    Msg:   db "hehe %% %s %d %b %o %x he", 0x0a
+    Msg:   db "-hehe %Y %e %% %s %d %b %o %x %c he", 0x0a, "%d %s %x %d%%%c%b", 0x0a, 0x00
     MsgLen equ $ - Msg
 
-    String db "i wanna sleep", 0x0a
+    String db "i wanna sleep", 0x00
+    love   db "love", 0x00
 
 section .text
 
@@ -78,7 +84,7 @@ Printf:
         xor rax, rax
         mov al, [rsi]                   ; load next sym of format str
 
-        cmp al, 0x0a                    ; check for end of str
+        test al, al                     ; check for end of str
         je .end
 
         cmp al, '%'                     ; check for argument
@@ -87,17 +93,17 @@ Printf:
         inc rsi                         ; get argument format
         mov al, [rsi]
 
-        cmp al, '%'                     ; check for "%%" - output of "%"
-        je .load_to_buf                 ; first skipped, print second
+        cmp al, 'b'                    
+        js .load_to_buf
+        cmp al, 'y'
+        jns .load_to_buf
 
-        sub al, 'b'                     ; index in table = ascii of form - ascii of b
-        call [call_table + rax*8]
-        add rbp, 8                      ; go to next arg in stack
-        inc rsi                         ; go to next sym in string
+        call [call_table + (rax - 'b') * 8] ; (call_table - 8*'b') + rax*8
+        add rbp, 8                          ; go to next arg in stack
+        inc rsi                             ; go to next sym in string
         jmp .get_sym
 
         .load_to_buf:
-
         stosb
         inc rsi
         jmp .get_sym
@@ -113,11 +119,11 @@ section .rodata
     call_table dq PrintfBin
                dq PrintfChar
                dq PrintfDec
-               dq 10 dup(0)
+               dq 10 dup(PrintfSym)
                dq PrintfOct
-               dq 3 dup(0)
+               dq 3 dup(PrintfSym)
                dq PrintfString
-               dq 4 dup(0)
+               dq 4 dup(PrintfSym)
                dq PrintfHex
 
 section .text
@@ -443,7 +449,7 @@ PrintfString:
     .external_loop:
         .internal_loop:             ; copy str to buf till full buf or end of str
             lodsb
-            cmp al, 0x0a
+            test al, al
             je .break
             stosb
         loop .internal_loop
@@ -456,5 +462,19 @@ PrintfString:
     jmp .external_loop
     
     .break: mov rsi, r8
+
+ret
+
+;===================================================================================================
+
+PrintfSym:
+
+    push rax
+    mov r9, rbp
+    mov rbp, rsp
+    call PrintfChar
+    pop rax
+    mov rbp, r9
+    sub rbp, 8
 
 ret
