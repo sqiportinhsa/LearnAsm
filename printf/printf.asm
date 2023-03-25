@@ -1,38 +1,31 @@
 section .text
-global _start
+global call_printf
+extern printf
 
-_start: 
-        mov rax, 0x01
-        mov rdi, 1
-        mov rsi, Msg
-        mov rdx, MsgLen
-        syscall
+call_printf:
+    pop qword [RetAddress]                 ; remove return adress from stack
 
-        push 127
-        push 33
-        push 100
-        push 3802
-        push love
-        push -1
-        push 0x30
-        push 1
-        push 1
-        push 1
-        push -1
-        push String
-        push Msg
-        call Printf
-        pop rax
-        pop rax
-        pop rax
-        pop rax
-        pop rax
-        pop rax
-        pop rax
+    push r9
+    push r8
+    push rcx
+    push rdx
+    push rsi
+    push rdi
 
-        mov rax, 0x3c
-        xor rdi, rdi
-        syscall
+    call NewPrintf
+
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop r8
+    pop r9
+
+    call printf
+
+    push qword [RetAddress]
+
+ret
 
 ;---------------------------------------------------------------------------------------------------
 
@@ -42,30 +35,28 @@ section .data
     MaxDecLen equ 20
     buf_size  equ 256
 
-    HexArr: db "0123456789ABCDEF"
+    HexArr: db "0123456789abcdef"
     DecBuf  db MaxDecLen dup(0)
     StrBuf  db buf_size  dup(0)
 
-    Msg:   db "-hehe %Y %e %% %s %d %b %o %x %c he", 0x0a, "%d %s %x %d%%%c%b", 0x0a, 0x00
-    MsgLen equ $ - Msg
-
-    String db "i wanna sleep", 0x00
-    love   db "love", 0x00
+    RetAddress dq 0
 
 section .text
 
 ;===================================================================================================
-;                                       Printf
+;                                       NewPrintf
 ;---------------------------------------------------------------------------------------------------
 ; Same func as printfs from stdio.h
 ;---------------------------------------------------------------------------------------------------
 ; Input: format srt and arguments in stack
+; Destroys: rbx rcx rdx rsi rdi
 ;---------------------------------------------------------------------------------------------------
 
-Printf:
-    lea rbp, [rsp + 8*1]                ; rbp -> 1st arg in stack (format line)
+NewPrintf:
+    push rbp                            ; save old rbp, it's preserved
+    lea rbp, [rsp + 8*2]                ; rbp -> 1st arg in stack (format line)
     mov rsi, [rbp]                      ; rsi -> format line
-    lea rbp, [rsp + 8*2]                ; rbp -> 2nd arg
+    lea rbp, [rsp + 8*3]                ; rbp -> 2nd arg
 
     mov rbx, StrBuf
     mov rdi, StrBuf
@@ -93,7 +84,7 @@ Printf:
         inc rsi                         ; get argument format
         mov al, [rsi]
 
-        cmp al, 'b'                    
+        cmp al, 'b'                     ; check borders of jump table
         js .load_to_buf
         cmp al, 'y'
         jns .load_to_buf
@@ -110,6 +101,7 @@ Printf:
 
     .end: 
         call DumpBuf
+        pop rbp
 ret
 
 ;---------------------------------------------------------------------------------------------------
@@ -217,7 +209,7 @@ PrintfDec:
     not rax                         ; num = -num - 1
     inc rax                         ; num = -num
     
-    .skip_sign:                     ; after skipping or without it positive num to write is in rax
+    .skip_sign:                     ; after skip or without it positive num is in rax
     mov rcx, MaxDecLen              ; set counter
     mov r8, rdi                     ; save rdi
     mov rdi, DecBuf                 ; write reversed num to special buffer
@@ -234,8 +226,7 @@ PrintfDec:
         xchg rdx, rax               ; rax = num // 10 = new num
     loop .digit_loop
 
-    mov rcx, rdi
-    sub rcx, DecBuf                 ; calc len of dec format
+    mov rcx, MaxDecLen              ; len of dec format in DecBuf
     dec rdi
 
     .skip_high_zero:
@@ -244,6 +235,9 @@ PrintfDec:
         jnz .break
         dec rdi
     loop .skip_high_zero
+
+    inc rdi                         ; ! jumped to break => rdx = 0 => write last zero
+    inc rcx
 
     .break:
     xchg r8, rdi                    ; r8  -> DecBuf end, rdi -> StrBuf
@@ -287,15 +281,28 @@ PrintfBin:
                                     ; for skip high zero bytes and write non-zero bytes
                                     ; for zero 8 skips and 1 writing of zero
     
-    .skip_high_zero:
+    .skip_high_byte_zero:
         mov r9, rdx
         shr r9, 7*8                 ; r9 = higher byte of rdx
         test r9, r9                 ; check higher byte for zero
         jnz .break                  ; stop if not zero byte found
         shl rdx, 8                  ; skip zero byte
-    loop .skip_high_zero
+    loop .skip_high_byte_zero
 
-    .break: shl rcx, 3              ; rcx *= 8 (rcx: byte counter -> bit counter)
+    .break: 
+    shl rcx, 3              ; rcx *= 8 (rcx: byte counter -> bit counter)
+    test rdx, rdx
+    je .inc_for_zero
+
+    .skip_high_bit_zero:
+        mov r9, rdx
+        shr r9, 8*8 - 1             ; r9 = higher bit of rdx
+        test r9, r9                 ; check higher byte for zero
+        jnz .write                  ; stop if not zero bit found
+        shl rdx, 1                  ; skip zero byte
+    loop .skip_high_bit_zero
+
+    .inc_for_zero: inc rcx           ; if rcx == 0, rdx was 0 => write '0' 1 time
 
     .write:
         mov rax, rdx
@@ -324,7 +331,7 @@ PrintfHex:
 
 
     mov rax, rbx
-    add rax, buf_size + 2*9             ; ax = max pos in buf after writing (0x + 2 sym per byte)
+    add rax, buf_size + 2               ; ax = max pos in buf after writing (2 sym per byte)
     cmp rdi, rax                        ; check if buffer fits string + char
     js .skip_dump                       ; if fits continue writing to buf without dump
 
@@ -334,24 +341,19 @@ PrintfHex:
 
     .skip_dump: 
     mov rdx, [rbp]
-    mov rcx, 8                          ; reg number has 8 bytes, common counter 
+    mov rcx, 8*2                        ; reg number has 8 bytes, common counter 
                                         ; for skip high zero bytes and write non-zero bytes.
                                         ; for zero 8 skips and 1 writing of zero
-
-    mov al, '0'                         ; write "0x"   
-    stosb
-    mov al, 'x'
-    stosb
     
     .skip_high_zero:
         mov r9, rdx
-        shr r9, 7*8                     ; r9 = higher byte of rdx
+        shr r9, 7*8 + 4                 ; r9 = higher 4 bits of rdx
         test r9, r9                     ; check higher byte for zero
-        jnz .break                      ; stop if not zero byte found
-        shl rdx, 8                      ; skip zero byte
+        jnz .write                      ; stop if not zero byte found
+        shl rdx, 4                      ; skip zero byte
     loop .skip_high_zero
 
-    .break: shl rcx, 1                  ; rcx *= 2 (rcx: byte counter -> 4-bit counter)
+    inc rcx                             ; if rcx == 0, rdx was 0 => write '0' 1 time
 
     .write:
         mov r8, rdx
@@ -378,7 +380,7 @@ ret
 PrintfOct:
 
     mov rax, rbx
-    add rax, buf_size + 22 + 1          ; ax = max pos in buf after writing (max 22 for num + '0')
+    add rax, buf_size + 22              ; ax = max pos in buf after writing (63+1 bit = 21+1 sym)
     cmp rdi, rax                        ; check if buffer fits string + char
     js .skip_dump                       ; if fits continue writing to buf without dump
 
@@ -388,12 +390,7 @@ PrintfOct:
 
     .skip_dump: 
     mov rdx, [rbp]
-    mov rcx, 8*8 - 1                    ; reg number has 8 bytes, skip higher 
-                                        ; for skip high zero bytes and write non-zero bytes.
-                                        ; for zero 8 skips and 1 writing of zero
-
-    mov al, '0'                         ; write "0" for oct output start   
-    stosb
+    mov rcx, 21                         ; rdx = 63 + 1 bit, 3 bit = 1 sym
 
     mov r9, rdx
     shr r9, 8*8 - 1                     ; write higher bit separately (64 = 1 + 21*3)
@@ -408,12 +405,11 @@ PrintfOct:
         mov r9, rdx
         shr r9, 8*8 - 3                 ; r9 = higher 3 bits
         test r9, r9                     ; check it for zero
-        jnz .break                      ; stop if not zero bits found
+        jnz .write                      ; stop if not zero bits found
         shl rdx, 3                      ; skip zero bits
-        sub rcx, 3
-    jmp .skip_high_zero
+    loop .skip_high_zero
 
-    .break:
+    inc rcx                             ; if rcx == 0, rdx was 0 => write '0' 1 time
 
     .write:
         mov rax, rdx
@@ -421,8 +417,7 @@ PrintfOct:
         add al, '0'                     ; al := ascii code of num in al
         stosb
         shl rdx, 3                      ; go to next 3 bits
-        sub rcx, 3
-    jne .write
+    loop .write
 
 ret
 
