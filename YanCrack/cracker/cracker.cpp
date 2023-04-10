@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <SFML/Graphics.hpp>
 
-#include "Game.h"
+//#include "Game.h"
 #include "file_reading.h"
 
-const int Hash_sum = 0;
-const int max_hash = 2^10;
+const int Hash_sum = 365360;
+const int max_hash = 1000000;
 
 int main(int argc, const char **argv) {
     CLArgs args = parse_cmd_line(argc, argv);
@@ -24,7 +24,7 @@ int main(int argc, const char **argv) {
         return 0;
     }
 
-	run_game();
+	//run_game();
 
     code[0] = 0xEB;
     code[1] = 0x50;

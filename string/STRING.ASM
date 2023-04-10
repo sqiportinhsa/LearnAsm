@@ -1,3 +1,5 @@
+.code
+
 ;----------------------------------------------------------
 ;			   | strlen |
 ;----------------------------------------------------------
@@ -39,6 +41,7 @@ endp
 
 ;----------------------------------------------------------
 
+
 ;----------------------------------------------------------
 ;			   | memcpy |
 ;----------------------------------------------------------
@@ -47,8 +50,8 @@ endp
 ;----------------------------------------------------------
 ; Expects:
 ; Entry: ds:[si] - src
-;	 es:[di] - dest
-;	 cx      - count
+;	 	 es:[di] - dest
+;	 	 cx      - count
 ; Exit: None
 ; Destroys: cx, si, di
 ;----------------------------------------------------------
@@ -62,6 +65,7 @@ Memcpy proc
 endp
 ;----------------------------------------------------------
 
+
 ;----------------------------------------------------------
 ;			   | strcpy |
 ;----------------------------------------------------------
@@ -70,8 +74,8 @@ endp
 ;----------------------------------------------------------
 ; Expects: none
 ; Entry: ds:[si] - src
-;	 es:[di] - dest
-;	 bl - end character
+;	 	 es:[di] - dest
+;	 	 bl      - end character
 ; Exit: none
 ; Destroys: ax, si, di
 ;----------------------------------------------------------
@@ -99,6 +103,7 @@ Strcpy proc
 endp
 ;----------------------------------------------------------
 
+
 ;----------------------------------------------------------
 ;			   | memset |
 ;----------------------------------------------------------
@@ -106,20 +111,21 @@ endp
 ;----------------------------------------------------------
 ; Expects:  None
 ; Entry:    es:[di] - pointer to the object to fill
-;	    al 	 - byte to copy
-;	    cx	 - count
+;	    	al 	 - byte to copy
+;	    	cx	 - count
 ; Exit:     None
 ; Destroys: cx, di
 ;----------------------------------------------------------
 
 Memset proc
 
-cld
-rep stosb
-ret
+	cld
+	rep stosb
+	ret
 
 endp
 ;----------------------------------------------------------
+
 
 ;----------------------------------------------------------
 ;			  | memcmp |
@@ -129,35 +135,40 @@ endp
 ;----------------------------------------------------------
 ; Expects:   None
 ; Entry:     es:[di] - first pointer
-;	     ds:[si] - second pointer
-; 	     cx	     - count
+;	     	 ds:[si] - second pointer
+; 	     	 cx	     - count
 ; Exit:	     cx = 0 for equal arrays
-;	     cx < 0 if the first diff byte in 
-;	     first arr is less then in second
-;	     cx > 0 otherwise
+;	     	 cx < 0 if the first diff byte in 
+;	     	 first arr is less then in second
+;	     	 cx > 0 otherwise
 ; Destroys:  cx, si, di
 ;----------------------------------------------------------
 
 Memcmp proc
 
+??CMP:
 	cld
-	rep cmpsb
+	cmpsb
 
-	jz ??Equal
-	js ??First
+	js  ??First 	; second - first < 0
+	jnz ??Second 	; second - first > 0 (not < and not =)
+loop ??Cmp
 
+	ret 			; after loop cx = 0
+
+??Second:	
+	xor cx, cx
 	inc cx
 	ret
 
-??Equal	xor cx, cx
-	ret
-
-??First	xor cx, cx
+??First:
+	xor cx, cx
 	dec cx
 	ret
 
 endp
 ;----------------------------------------------------------
+
 
 ;----------------------------------------------------------
 ;			  | strcmp |
@@ -166,24 +177,25 @@ endp
 ;----------------------------------------------------------
 ; Expects: 	None
 ; Entry:	ds:[si] - first  string aka lhs
-;		es:[di] - second string aka rhs
-		bl 	- string end character
+;			es:[di] - second string aka rhs
+			bl 	- string end character
 ; Exit:		ax = 0 for equal strings
-;		ax < 0 if lhs is before rhs
-;		ax > 0 otherwise
+;			ax < 0 if lhs is before rhs
+;			ax > 0 otherwise
 ; Destroys:	ax, si, di
 ;----------------------------------------------------------
 
 Strcmp proc
 
-??Cmp:	mov al, es:[di]
+??Cmp:	
+	mov al, es:[di]
 	mov ah, ds:[si]
 
 	cld
 	cmpsb
 	js  ??Rhs 	; if byte in rhs is greater
 	jnz ??Lhs	; if bytes are neq 
-			;  but rhs isnt greater
+			    ;  but rhs isnt greater
 
 	cmp al, bl
 	je ??Eq		; strings are eq

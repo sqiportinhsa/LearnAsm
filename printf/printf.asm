@@ -5,6 +5,22 @@ extern printf
 call_printf:
     pop qword [RetAddress]                 ; remove return adress from stack
 
+    mov [StoreR9], r9
+    mov [StoreR8], r8
+    mov [StoreRCX], rcx
+    mov [StoreRDX], rdx
+    mov [StoreRSI], rsi
+    mov [StoreRDI], rdi
+ 
+    call printf
+
+    mov rdi, [StoreRDI]
+    mov rsi, [StoreRSI]
+    mov rdx, [StoreRDX]
+    mov rcx, [StoreRCX]
+    mov r8,  [StoreR8]
+    mov r9,  [StoreR9]
+
     push r9
     push r8
     push rcx
@@ -20,6 +36,12 @@ call_printf:
     pop rcx
     pop r8
     pop r9
+
+    call printf
+
+    mov rdi, MyStr
+    mov rsi, 10
+    mov rdx, 2
 
     call printf
 
@@ -41,6 +63,15 @@ section .data
 
     RetAddress dq 0
 
+    MyStr: db "Hello world! %d %b :3", 0x0a, 0x00
+
+    StoreR9  db 8 dup(0)
+    StoreR8  db 8 dup(0)
+    StoreRCX db 8 dup(0)
+    StoreRDX db 8 dup(0)
+    StoreRSI db 8 dup(0)
+    StoreRDI db 8 dup(0)
+
 section .text
 
 ;===================================================================================================
@@ -53,10 +84,11 @@ section .text
 ;---------------------------------------------------------------------------------------------------
 
 NewPrintf:
-    push rbp                            ; save old rbp, it's preserved
-    lea rbp, [rsp + 8*2]                ; rbp -> 1st arg in stack (format line)
+    push rbp 
+    push rbx                            ; save old rbp & rbx, it's preserved
+    lea rbp, [rsp + 8*3]                ; rbp -> 1st arg in stack (format line)
     mov rsi, [rbp]                      ; rsi -> format line
-    lea rbp, [rsp + 8*3]                ; rbp -> 2nd arg
+    lea rbp, [rsp + 8*4]                ; rbp -> 2nd arg
 
     mov rbx, StrBuf
     mov rdi, StrBuf
@@ -101,6 +133,7 @@ NewPrintf:
 
     .end: 
         call DumpBuf
+        pop rbx
         pop rbp
 ret
 

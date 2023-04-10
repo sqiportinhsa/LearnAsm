@@ -137,5 +137,32 @@ ret
 endp
 ;====================================================================
 
+;====================================================================
+;                           | Copy Strings |
+;====================================================================
+; Copies 'height' strings of FrWidth len (sym) in 2dim arrays 
+; of ScrWidth width from ds:[si] to es:[di]
+;--------------------------------------------------------------------
+; Expects:   ds:[si] - source
+;            es:[di] - destination
+;            source and destination is 2dim arrays of ScrWidth width
+; Entry:     ax = height
+; Output:    None
+; Destroys:  ax, cx, si, di
+;--------------------------------------------------------------------
+CopyStrings proc
+
+    cld
+    
+??MoveString:
+    mov cx, FrWidth
+    rep movsw
+    add si, ScrWidth - 2*FrWidth
+    dec ax
+    test ax, ax
+jnz ??MoveString
+
+ret
+
 ; data
 ScrWidth equ 160d

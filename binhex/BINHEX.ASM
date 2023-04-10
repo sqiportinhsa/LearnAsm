@@ -35,7 +35,7 @@ PrBin	proc
 	ret
 	endp
 ;-----------------------------------------------------------
-;			 | PrHex |
+;			 | PrHex | xlat
 ;-----------------------------------------------------------
 ; Prints colored number in hex system
 ;-----------------------------------------------------------
@@ -147,7 +147,7 @@ PrFrame proc
 	mov word ptr es:[si], bx
 	add SI, ScrWidth
 
-	mov BL, LRCorner		; ser low right corner
+	mov BL, LRCorner		; set low right corner
 	mov word ptr es:[di], bx
 	sub di, ScrWidth
 
